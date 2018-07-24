@@ -1693,6 +1693,10 @@
 		{
 			"ImportPath": "k8s.io/kube-openapi/pkg/util/proto",
 			"Rev": "0cf8f7e6ed1d2e3d47d02e3b6e559369af24d803"
+		},
+		{
+			"ImportPath": "k8s.io/kubernetes/pkg/kubeapiserver/apis/kubeapiserverconfig",
+			"Rev": "670f6904702166c0ad9e41fc5eaba3ec48a987e3"
 		}
 	]
 }
