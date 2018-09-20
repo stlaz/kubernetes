@@ -2698,6 +2698,8 @@ type PodSecurityContext struct {
 	// sysctls (by the container runtime) might fail to launch.
 	// +optional
 	Sysctls []Sysctl
+	// +optional
+	SeccompProfile *string
 }
 
 // PodQOSClass defines the supported qos classes of Pods.
@@ -4633,6 +4635,8 @@ type SecurityContext struct {
 	// readonly paths and masked paths.
 	// +optional
 	ProcMount *ProcMountType
+	// +optional
+	SeccompProfile *string
 }
 
 type ProcMountType string
