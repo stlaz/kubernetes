@@ -3427,6 +3427,11 @@ func (in *PodSecurityContext) DeepCopyInto(out *PodSecurityContext) {
 		*out = make([]Sysctl, len(*in))
 		copy(*out, *in)
 	}
+	if in.SeccompProfile != nil {
+		in, out := &in.SeccompProfile, &out.SeccompProfile
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 
@@ -4602,6 +4607,11 @@ func (in *SecurityContext) DeepCopyInto(out *SecurityContext) {
 	if in.ProcMount != nil {
 		in, out := &in.ProcMount, &out.ProcMount
 		*out = new(ProcMountType)
+		**out = **in
+	}
+	if in.SeccompProfile != nil {
+		in, out := &in.SeccompProfile, &out.SeccompProfile
+		*out = new(string)
 		**out = **in
 	}
 	return

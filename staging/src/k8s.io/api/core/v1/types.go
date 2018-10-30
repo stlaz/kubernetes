@@ -2968,7 +2968,7 @@ type PodSecurityContext struct {
 	// +optional
 	Sysctls []Sysctl `json:"sysctls,omitempty" protobuf:"bytes,7,rep,name=sysctls"`
 	// +optional
-	SeccompProfile *string `json:"seccompProfile,omitempty"`
+	SeccompProfile *string `json:"seccompProfile,omitempty" protobuf:"bytes,8,opt,name=seccompProfile"`
 }
 
 // PodQOSClass defines the supported qos classes of Pods.
@@ -5230,7 +5230,7 @@ type SecurityContext struct {
 	// +optional
 	ProcMount *ProcMountType `json:"procMount,omitempty" protobuf:"bytes,9,opt,name=procMount"`
 	// +optional
-	SeccompProfile *string `json:"seccompProfile,omitEmpty"`
+	SeccompProfile *string `json:"seccompProfile,omitEmpty" protobuf:"bytes,10,opt,name=seccompProfile"`
 }
 
 type ProcMountType string
