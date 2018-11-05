@@ -52,6 +52,7 @@ func TestDefaultPodSecurityContextNonmutating(t *testing.T) {
 	}
 
 	// Create a PSP with strategies that will populate a blank psc
+	// TODO: create field + annotation? Do we need annotations?
 	allowPrivilegeEscalation := true
 	createPSP := func() *policy.PodSecurityPolicy {
 		return &policy.PodSecurityPolicy{
@@ -130,6 +131,10 @@ func TestDefaultContainerSecurityContextNonmutating(t *testing.T) {
 			return &policy.PodSecurityPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "psp-sa",
+					Annotations: map[string]string{
+						seccomp.AllowedProfilesAnnotationKey: "*",
+						seccomp.DefaultProfileAnnotationKey:  "foo",
+					},
 				},
 				Spec: policy.PodSecurityPolicySpec{
 					AllowPrivilegeEscalation: &allowPrivilegeEscalation,
@@ -148,7 +153,6 @@ func TestDefaultContainerSecurityContextNonmutating(t *testing.T) {
 					SupplementalGroups: policy.SupplementalGroupsStrategyOptions{
 						Rule: policy.SupplementalGroupsStrategyRunAsAny,
 					},
-					AllowedSeccompProfiles: []string{seccomp.SeccompAllowAny},
 				},
 			}
 		}
@@ -167,7 +171,7 @@ func TestDefaultContainerSecurityContextNonmutating(t *testing.T) {
 
 		// Creating the provider or the security context should not have mutated the psp or pod
 		// since all the strategies were permissive
-		if x := createPod(); !reflect.DeepEqual(x, pod) {
+		if !reflect.DeepEqual(createPod(), pod) {
 			diffs := diff.ObjectDiff(createPod(), pod)
 			t.Errorf("pod was mutated by DefaultContainerSecurityContext. diff:\n%s", diffs)
 		}
@@ -320,8 +324,7 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 	}
 
 	failSeccompProfilePod := defaultPod()
-	failSeccompProfilePodSeccompString := "foo"
-	failSeccompProfilePod.Spec.SecurityContext.SeccompProfile = &failSeccompProfilePodSeccompString
+	failSeccompProfilePod.Annotations = map[string]string{api.SeccompPodAnnotationKey: "foo"}
 
 	podWithInvalidFlexVolumeDriver := defaultPod()
 	podWithInvalidFlexVolumeDriver.Spec.Volumes = []api.Volume{
@@ -428,7 +431,7 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 		"failInvalidSeccomp": {
 			pod:           failSeccompProfilePod,
 			psp:           defaultPSP(),
-			expectedError: "Forbidden: seccomp must not be set",
+			expectedError: "Forbidden: seccomp may not be set",
 		},
 		"fail pod with disallowed flexVolume when flex volumes are allowed": {
 			pod:           podWithInvalidFlexVolumeDriver,
@@ -539,8 +542,14 @@ func TestValidateContainerFailures(t *testing.T) {
 	readOnlyRootFSPodFalse.Spec.Containers[0].SecurityContext.ReadOnlyRootFilesystem = &readOnlyRootFS
 
 	failSeccompPod := defaultPod()
-	failSeccompPodString := "foo"
-	failSeccompPod.Spec.Containers[0].SecurityContext.SeccompProfile = &failSeccompPodString
+	failSeccompPod.Annotations = map[string]string{
+		api.SeccompContainerAnnotationKeyPrefix + failSeccompPod.Spec.Containers[0].Name: "foo",
+	}
+
+	failSeccompPodInheritPodAnnotation := defaultPod()
+	failSeccompPodInheritPodAnnotation.Annotations = map[string]string{
+		api.SeccompPodAnnotationKey: "foo",
+	}
 
 	errorCases := map[string]struct {
 		pod           *api.Pod
@@ -597,10 +606,15 @@ func TestValidateContainerFailures(t *testing.T) {
 			psp:           readOnlyRootFSPSP,
 			expectedError: "ReadOnlyRootFilesystem must be set to true",
 		},
-		"failSeccompContainerSpec": {
+		"failSeccompContainerAnnotation": {
 			pod:           failSeccompPod,
 			psp:           defaultPSP(),
-			expectedError: "Forbidden: seccomp must not be set",
+			expectedError: "Forbidden: seccomp may not be set",
+		},
+		"failSeccompContainerPodAnnotation": {
+			pod:           failSeccompPodInheritPodAnnotation,
+			psp:           defaultPSP(),
+			expectedError: "Forbidden: seccomp may not be set",
 		},
 	}
 
@@ -791,6 +805,8 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 
 	seccompFooProfile := "foo"
 	seccompPSP := defaultPSP()
+
+	// FIXME: how to test both Annotations and Fields?
 	seccompPSP.Spec.AllowedSeccompProfiles = []string{seccompFooProfile}
 
 	seccompPod := defaultPod()
@@ -798,6 +814,14 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 
 	seccompPodContainer := defaultPod()
 	seccompPodContainer.Spec.Containers[0].SecurityContext.SeccompProfile = &seccompFooProfile
+	seccompPSP.Annotations = map[string]string{
+		seccomp.AllowedProfilesAnnotationKey: "foo",
+	}
+
+	seccompPod := defaultPod()
+	seccompPod.Annotations = map[string]string{
+		api.SeccompPodAnnotationKey: "foo",
+	}
 
 	flexVolumePod := defaultPod()
 	flexVolumePod.Spec.Volumes = []api.Volume{
@@ -990,14 +1014,19 @@ func TestValidateContainerSuccess(t *testing.T) {
 	readOnlyRootFSPodTrue.Spec.Containers[0].SecurityContext.ReadOnlyRootFilesystem = &readOnlyRootFSTrue
 
 	seccompPSP := defaultPSP()
-	seccompPSP.Spec.AllowedSeccompProfiles = []string{"foo"}
+	seccompPSP.Annotations = map[string]string{
+		seccomp.AllowedProfilesAnnotationKey: "foo",
+	}
 
-	seccompFooProfile := "foo"
 	seccompPod := defaultPod()
-	seccompPod.Spec.Containers[0].SecurityContext.SeccompProfile = &seccompFooProfile
+	seccompPod.Annotations = map[string]string{
+		api.SeccompContainerAnnotationKeyPrefix + seccompPod.Spec.Containers[0].Name: "foo",
+	}
 
 	seccompPodInherit := defaultPod()
-	seccompPodInherit.Spec.SecurityContext.SeccompProfile = &seccompFooProfile
+	seccompPodInherit.Annotations = map[string]string{
+		api.SeccompPodAnnotationKey: "foo",
+	}
 
 	successCases := map[string]struct {
 		pod *api.Pod
