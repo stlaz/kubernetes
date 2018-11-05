@@ -42,6 +42,7 @@ type SeccompStrategy interface {
 	ValidatePod(pod *api.Pod, podSCPath *field.Path) field.ErrorList
 	// Validate ensures that the specified values fall within the range of the strategy.
 	ValidateContainer(pod *api.Pod, container *api.Container, contSCPath *field.Path) field.ErrorList
+	validate(fieldPath *field.Path, profile *string) field.ErrorList
 }
 
 type seccompStrategy struct {
@@ -125,7 +126,7 @@ func (s *seccompStrategy) ValidatePod(pod *api.Pod, podSCPath *field.Path) field
 // ValidateContainer ensures that the specified values on the container fall within
 // the range of the strategy.
 func (s *seccompStrategy) ValidateContainer(pod *api.Pod, container *api.Container, contSCPath *field.Path) field.ErrorList {
-	containerProfile, foundField := getContainerSeccompProfile(pod.Annotations, container.Name, container.SecurityContext, contSCPath)
+	containerProfile, foundField := getContainerSeccompProfile(pod, container.Name, container.SecurityContext, contSCPath)
 	return s.validate(foundField, containerProfile)
 }
 
@@ -172,8 +173,8 @@ func (s *seccompStrategy) profileAllowed(profile *string) bool {
 }
 
 func getPodSeccompProfile(pod *api.Pod, scPath *field.Path) (*string, *field.Path) {
-	if p := pod.Spec.SecurityContext.SeccompProfile; p != nil {
-		return p, scPath
+	if sc := pod.Spec.SecurityContext; sc != nil && sc.SeccompProfile != nil {
+		return sc.SeccompProfile, scPath
 	}
 
 	if p, found := pod.Annotations[api.SeccompPodAnnotationKey]; found {
@@ -183,13 +184,17 @@ func getPodSeccompProfile(pod *api.Pod, scPath *field.Path) (*string, *field.Pat
 	return nil, nil
 }
 
-func getContainerSeccompProfile(podAnnotations map[string]string, containerName string, containerSC *api.SecurityContext, contSCPath *field.Path) (*string, *field.Path) {
+func getContainerSeccompProfile(pod *api.Pod, containerName string, containerSC *api.SecurityContext, contSCPath *field.Path) (*string, *field.Path) {
 	if containerSC != nil && containerSC.SeccompProfile != nil {
 		return containerSC.SeccompProfile, contSCPath
 	}
 
-	if p, found := podAnnotations[api.SeccompContainerAnnotationKeyPrefix+containerName]; found {
+	if p, found := pod.Annotations[api.SeccompContainerAnnotationKeyPrefix+containerName]; found {
 		return &p, field.NewPath("pod", "metadata", "annotations").Key(api.SeccompContainerAnnotationKeyPrefix + containerName)
+	}
+
+	if podProfile, foundField := getPodSeccompProfile(pod, field.NewPath("pod", "spec", "securityContext", "seccompProfile")); podProfile != nil {
+		return podProfile, foundField
 	}
 
 	return nil, nil
