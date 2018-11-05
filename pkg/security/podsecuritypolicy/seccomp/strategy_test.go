@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -113,7 +114,13 @@ func TestNewStrategy(t *testing.T) {
 		},
 	}
 	for k, v := range tests {
-		s := NewSeccompStrategy(v.strategy.defaultProfile, v.strategy.allowedProfiles)
+		policy := &policy.PodSecurityPolicy{
+			Spec: policy.PodSecurityPolicySpec{
+				DefaultSeccompProfile:  v.strategy.defaultProfile,
+				AllowedSeccompProfiles: v.strategy.allowedProfiles,
+			},
+		}
+		s := NewSeccompStrategy(policy)
 		internalStrat, _ := s.(*seccompStrategy)
 
 		if internalStrat.allowAnyProfile != v.expectedAllowAny {
@@ -185,7 +192,13 @@ func TestGenerate(t *testing.T) {
 				},
 			},
 		}
-		s := NewSeccompStrategy(v.pspStrategy.defaultProfile, v.pspStrategy.allowedProfiles)
+		policy := &policy.PodSecurityPolicy{
+			Spec: policy.PodSecurityPolicySpec{
+				DefaultSeccompProfile:  v.pspStrategy.defaultProfile,
+				AllowedSeccompProfiles: v.pspStrategy.allowedProfiles,
+			},
+		}
+		s := NewSeccompStrategy(policy)
 		actual, err := s.Generate(pod, nil)
 		if err != nil {
 			t.Errorf("%s received error during generation %#v", k, err)
@@ -250,8 +263,15 @@ func TestValidate(t *testing.T) {
 		},
 	}
 	for k, v := range tests {
-		s := NewSeccompStrategy(v.pspSpec.defaultProfile, v.pspSpec.allowedProfiles)
-		errs := s.Validate(field.NewPath(""), v.seccompProfile)
+		policy := &policy.PodSecurityPolicy{
+			Spec: policy.PodSecurityPolicySpec{
+				DefaultSeccompProfile:  v.pspSpec.defaultProfile,
+				AllowedSeccompProfiles: v.pspSpec.allowedProfiles,
+			},
+		}
+		s := NewSeccompStrategy(policy)
+		// FIXME: remove validate() from the interface, split test into validatePod and validateContainer
+		errs := s.validate(field.NewPath(""), v.seccompProfile)
 		if v.expectedError == "" && len(errs) != 0 {
 			t.Errorf("%s expected no errors but received %#v", k, errs.ToAggregate().Error())
 		}
