@@ -93,7 +93,7 @@ func newSeccompStrategy(defaultSeccompProfile *string, allowedSeccompProfiles []
 	return &seccompStrategy{
 		defaultProfile:        defaultSeccompProfile,
 		allowedProfiles:       allowedProfiles,
-		allowedProfilesString: strings.Join(allowedSeccompProfiles, ", "),
+		allowedProfilesString: strings.Join(allowedSeccompProfiles, ","),
 		allowAnyProfile:       allowAnyProfile,
 	}
 }
@@ -102,14 +102,14 @@ func newSeccompStrategy(defaultSeccompProfile *string, allowedSeccompProfiles []
 // it returns a profile based on the defaultProfile from the given strategy
 func (s *seccompStrategy) Generate(pod *api.Pod, container *api.Container) (*string, error) {
 	// FIXME: needs fixing to also work with annotations
-	if container != nil && container.SecurityContext != nil {
-		if p := container.SecurityContext.SeccompProfile; p != nil {
+	if container != nil {
+		if p, _ := getContainerSeccompProfile(pod, container.Name, container.SecurityContext, nil); p != nil {
 			return p, nil
 		}
 	}
 
 	if pod != nil && pod.Spec.SecurityContext != nil {
-		if p := pod.Spec.SecurityContext.SeccompProfile; p != nil {
+		if p, _ := getPodSeccompProfile(pod, nil); p != nil {
 			return p, nil
 		}
 	}
