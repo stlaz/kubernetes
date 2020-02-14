@@ -467,6 +467,7 @@ items:
   - apiGroups:
     - apps
     resources:
+    - controllerrevisions
     - daemonsets
     - deployments
     - deployments/scale
