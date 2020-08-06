@@ -32,32 +32,43 @@ func TestFailValidateAuthenticationSpec(t *testing.T) {
 		},
 		"invalid webhook ref": {
 			spec: configv1.AuthenticationSpec{
-				WebhookTokenAuthenticators: []configv1.DeprecatedWebhookTokenAuthenticator{
-					{KubeConfig: configv1.SecretNameReference{Name: "this+that"}},
+				Type: configv1.AuthenticationTypeNone,
+				WebhookTokenAuthenticator: &configv1.WebhookTokenAuthenticator{
+					KubeConfig: configv1.SecretNameReference{Name: "this+that"},
 				},
 			},
 			errorType:  field.ErrorTypeInvalid,
-			errorField: "spec.webhookTokenAuthenticators[0].kubeConfig.name",
-		},
-		"invalid webhook ref - multiple webhooks": {
-			spec: configv1.AuthenticationSpec{
-				WebhookTokenAuthenticators: []configv1.DeprecatedWebhookTokenAuthenticator{
-					{KubeConfig: configv1.SecretNameReference{Name: "that.now"}},
-					{KubeConfig: configv1.SecretNameReference{Name: "this+that"}},
-					{KubeConfig: configv1.SecretNameReference{Name: "this.then"}},
-				},
-			},
-			errorType:  field.ErrorTypeInvalid,
-			errorField: "spec.webhookTokenAuthenticators[1].kubeConfig.name",
+			errorField: "spec.webhookTokenAuthenticator.kubeConfig.name",
 		},
 		"empty webhook name": {
 			spec: configv1.AuthenticationSpec{
-				WebhookTokenAuthenticators: []configv1.DeprecatedWebhookTokenAuthenticator{
-					{KubeConfig: configv1.SecretNameReference{Name: ""}},
+				Type: configv1.AuthenticationTypeNone,
+				WebhookTokenAuthenticator: &configv1.WebhookTokenAuthenticator{
+					KubeConfig: configv1.SecretNameReference{Name: ""},
 				},
 			},
 			errorType:  field.ErrorTypeRequired,
-			errorField: "spec.webhookTokenAuthenticators[0].kubeConfig.name",
+			errorField: "spec.webhookTokenAuthenticator.kubeConfig.name",
+		},
+
+		"webhookTokenAuthenticator set when type == IntegratedOAuth": {
+			spec: configv1.AuthenticationSpec{
+				Type: configv1.AuthenticationTypeIntegratedOAuth,
+				WebhookTokenAuthenticator: &configv1.WebhookTokenAuthenticator{
+					KubeConfig: configv1.SecretNameReference{Name: "something"},
+				},
+			},
+			errorType:  field.ErrorTypeForbidden,
+			errorField: "spec.webhookTokenAuthenticator",
+		},
+		"webhookTokenAuthenticator set with empty type (default => IntegratedOAuth)": {
+			spec: configv1.AuthenticationSpec{
+				WebhookTokenAuthenticator: &configv1.WebhookTokenAuthenticator{
+					KubeConfig: configv1.SecretNameReference{Name: "something"},
+				},
+			},
+			errorType:  field.ErrorTypeForbidden,
+			errorField: "spec.webhookTokenAuthenticator",
 		},
 	}
 

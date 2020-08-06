@@ -113,21 +113,38 @@ func validateAuthenticationSpec(spec configv1.AuthenticationSpec) field.ErrorLis
 	}
 
 	errs = append(errs, crvalidation.ValidateConfigMapReference(specField.Child("oauthMetadata"), spec.OAuthMetadata, false)...)
-
-	// validate the secret names in WebhookTokenAuthenticators
-	for i, wh := range spec.WebhookTokenAuthenticators {
-		errs = append(
-			errs,
-			crvalidation.ValidateSecretReference(
-				specField.Child("webhookTokenAuthenticators").Index(i).Child("kubeConfig"),
-				wh.KubeConfig,
-				true,
-			)...)
-	}
+	errs = append(
+		errs,
+		validateWebhookTokenAuthenticator(
+			specField.Child("webhookTokenAuthenticator"),
+			spec.WebhookTokenAuthenticator,
+			spec.Type,
+		)...)
 
 	return errs
 }
 
 func validateAuthenticationStatus(status configv1.AuthenticationStatus) field.ErrorList {
 	return crvalidation.ValidateConfigMapReference(field.NewPath("status", "integratedOAuthMetadata"), status.IntegratedOAuthMetadata, false)
+}
+
+func validateWebhookTokenAuthenticator(fldPath *field.Path, whAuthenticator *configv1.WebhookTokenAuthenticator, authType configv1.AuthenticationType) field.ErrorList {
+	errs := field.ErrorList{}
+
+	if whAuthenticator == nil {
+		return errs
+	}
+
+	if authType == configv1.AuthenticationTypeIntegratedOAuth || authType == "" {
+		// IntegratedOAuth is mutually exclusive to webhook token authentication
+		return append(errs, field.Forbidden(fldPath, "WebhookTokenAuthenticator cannot be set when Type is unset or set to IntegratedOAuth"))
+	}
+
+	errs = append(errs, crvalidation.ValidateSecretReference(
+		fldPath.Child("kubeConfig"),
+		whAuthenticator.KubeConfig,
+		true,
+	)...)
+
+	return errs
 }
