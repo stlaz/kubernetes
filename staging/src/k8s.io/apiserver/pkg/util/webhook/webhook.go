@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/util/x509metrics"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -96,6 +97,7 @@ func newGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFact
 	clientConfig.ContentConfig.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec})
 
 	clientConfig.Dial = customDial
+	clientConfig.Wrap(x509metrics.MissingSANRoundTripperWrapperFunc(x509MissingSANCounter))
 
 	restClient, err := rest.UnversionedRESTClientFor(clientConfig)
 	if err != nil {
