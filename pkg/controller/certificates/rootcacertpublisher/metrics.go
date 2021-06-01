@@ -17,6 +17,7 @@ limitations under the License.
 package rootcacertpublisher
 
 import (
+	"net/http"
 	"strconv"
 	"sync"
 	"time"
@@ -60,6 +61,14 @@ func recordMetrics(start time.Time, ns string, err error) {
 	}
 	syncLatency.WithLabelValues(ns, code).Observe(time.Since(start).Seconds())
 	syncCounter.WithLabelValues(ns, code).Inc()
+}
+
+func cleanupMetrics(ns string) {
+	for code := http.StatusContinue; code <= http.StatusNetworkAuthenticationRequired; code++ {
+		codeStr := strconv.Itoa(code)
+		syncLatency.DeleteLabelValues(ns, codeStr)
+		syncCounter.DeleteLabelValues(ns, codeStr)
+	}
 }
 
 var once sync.Once

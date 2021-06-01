@@ -18,13 +18,17 @@ package rootcacertpublisher
 
 import (
 	"reflect"
+	"strings"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -128,8 +132,6 @@ func TestConfigMapCreation(t *testing.T) {
 
 			cmStore := cmInformer.Informer().GetStore()
 
-			controller.syncHandler = controller.syncNamespace
-
 			for _, s := range tc.ExistingConfigMaps {
 				cmStore.Add(s)
 			}
@@ -161,6 +163,48 @@ func TestConfigMapCreation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNSDeletion(t *testing.T) {
+	// make sure the tested metrics is reset at the start of the test
+	syncCounter.Reset()
+
+	deletedNs := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: "deleted-ns"},
+		Status: v1.NamespaceStatus{
+			Phase: v1.NamespaceTerminating,
+		},
+	}
+
+	// setup some metrics
+	recordMetrics(time.Now(), "deleted-ns", nil)
+	recordMetrics(time.Now(), "not-a-deleted-ns", nil)
+
+	client := fake.NewSimpleClientset()
+	informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), controller.NoResyncPeriodFunc())
+	cmInformer := informers.Core().V1().ConfigMaps()
+	nsInformer := informers.Core().V1().Namespaces()
+	controller, err := NewPublisher(cmInformer, nsInformer, client, []byte("fake-root-ca"))
+	if err != nil {
+		t.Fatalf("error creating RootCA Publisher controller: %v", err)
+	}
+
+	controller.namespaceDeleted(deletedNs)
+
+	for controller.queue.Len() != 0 {
+		controller.processNextWorkItem()
+	}
+
+	expectedMetrics := `
+	# HELP root_ca_cert_publisher_sync_total [ALPHA] Number of namespace syncs happened in root ca cert publisher.
+	# TYPE root_ca_cert_publisher_sync_total counter
+	root_ca_cert_publisher_sync_total{code="200",namespace="not-a-deleted-ns"} 1
+	`
+
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedMetrics), "root_ca_cert_publisher_sync_total"); err != nil {
+		t.Fatal(err)
+	}
+
 }
 
 func defaultCrtConfigMapPtr(rootCA []byte) *v1.ConfigMap {

@@ -95,3 +95,61 @@ root_ca_cert_publisher_sync_total{code="500",namespace="test-ns"} 1
 		})
 	}
 }
+
+func TestSyncCounterCleanup(t *testing.T) {
+	setupMetrics := func() {
+		recordMetrics(time.Now(), "test-ns", &apierrors.StatusError{})
+		recordMetrics(time.Now(), "test-ns", apierrors.NewNotFound(corev1.Resource("configmap"), "test-configmap"))
+		recordMetrics(time.Now(), "test-ns", nil)
+		recordMetrics(time.Now(), "test-ns", nil)
+
+		recordMetrics(time.Now(), "test-removed-ns", &apierrors.StatusError{})
+		recordMetrics(time.Now(), "test-removed-ns", apierrors.NewNotFound(corev1.Resource("configmap"), "test-configmap"))
+		recordMetrics(time.Now(), "test-removed-ns", nil)
+
+	}
+
+	testCases := []struct {
+		desc      string
+		removedNS string
+		want      string
+	}{
+		{
+			desc:      "deleted ns not found in metrics",
+			removedNS: "very-random-ns",
+			want: `
+# HELP root_ca_cert_publisher_sync_total [ALPHA] Number of namespace syncs happened in root ca cert publisher.
+# TYPE root_ca_cert_publisher_sync_total counter
+root_ca_cert_publisher_sync_total{code="200",namespace="test-ns"} 2
+root_ca_cert_publisher_sync_total{code="200",namespace="test-removed-ns"} 1
+root_ca_cert_publisher_sync_total{code="404",namespace="test-ns"} 1
+root_ca_cert_publisher_sync_total{code="404",namespace="test-removed-ns"} 1
+root_ca_cert_publisher_sync_total{code="500",namespace="test-ns"} 1
+root_ca_cert_publisher_sync_total{code="500",namespace="test-removed-ns"} 1
+`,
+		},
+		{
+			desc:      "ns with existing metrics",
+			removedNS: "test-removed-ns",
+			want: `
+# HELP root_ca_cert_publisher_sync_total [ALPHA] Number of namespace syncs happened in root ca cert publisher.
+# TYPE root_ca_cert_publisher_sync_total counter
+root_ca_cert_publisher_sync_total{code="200",namespace="test-ns"} 2
+root_ca_cert_publisher_sync_total{code="404",namespace="test-ns"} 1
+root_ca_cert_publisher_sync_total{code="500",namespace="test-ns"} 1
+				`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			setupMetrics()
+			cleanupMetrics(tc.removedNS)
+
+			defer syncCounter.Reset()
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tc.want), "root_ca_cert_publisher_sync_total"); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
