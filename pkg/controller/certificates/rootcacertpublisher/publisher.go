@@ -49,6 +49,8 @@ func init() {
 	registerMetrics()
 }
 
+type deletedKey string
+
 // NewPublisher construct a new controller which would manage the configmap
 // which stores certificates in each namespace. It will make sure certificate
 // configmap exists in each namespace.
@@ -74,10 +76,9 @@ func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinf
 	nsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    e.namespaceAdded,
 		UpdateFunc: e.namespaceUpdated,
+		DeleteFunc: e.namespaceDeleted,
 	})
 	e.nsListerSynced = nsInformer.Informer().HasSynced
-
-	e.syncHandler = e.syncNamespace
 
 	return e, nil
 
@@ -87,9 +88,6 @@ func NewPublisher(cmInformer coreinformers.ConfigMapInformer, nsInformer coreinf
 type Publisher struct {
 	client clientset.Interface
 	rootCA []byte
-
-	// To allow injection for testing.
-	syncHandler func(key string) error
 
 	cmLister       corelisters.ConfigMapLister
 	cmListerSynced cache.InformerSynced
@@ -155,6 +153,23 @@ func (c *Publisher) namespaceUpdated(oldObj interface{}, newObj interface{}) {
 	c.queue.Add(newNamespace.Name)
 }
 
+func (c *Publisher) namespaceDeleted(obj interface{}) {
+	namespace, ok := obj.(*v1.Namespace)
+	if !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			klog.Errorf("Couldn't get object from tombstone %+v", obj)
+			return
+		}
+		namespace, ok = tombstone.Obj.(*v1.Namespace)
+		if !ok {
+			klog.Errorf("Tombstone contained object that is not a namespace %+v", obj)
+			return
+		}
+	}
+	c.queue.Add(deletedKey(namespace.Name))
+}
+
 func (c *Publisher) runWorker() {
 	for c.processNextWorkItem() {
 	}
@@ -169,7 +184,12 @@ func (c *Publisher) processNextWorkItem() bool {
 	}
 	defer c.queue.Done(key)
 
-	if err := c.syncHandler(key.(string)); err != nil {
+	syncHandler := c.syncNamespace
+	if deletedKeyValue, ok := key.(deletedKey); ok {
+		syncHandler = c.syncDeletedNamespace
+		key = string(deletedKeyValue)
+	}
+	if err := syncHandler(key.(string)); err != nil {
 		utilruntime.HandleError(fmt.Errorf("syncing %q failed: %v", key, err))
 		c.queue.AddRateLimited(key)
 		return true
@@ -177,6 +197,13 @@ func (c *Publisher) processNextWorkItem() bool {
 
 	c.queue.Forget(key)
 	return true
+}
+
+// syncDeletedNamespace cleans up the metrics for a given namespace so that these
+// don't pollute Prometheus in high-namespace create/delete churn environments
+func (c *Publisher) syncDeletedNamespace(ns string) error {
+	cleanupMetrics(ns)
+	return nil
 }
 
 func (c *Publisher) syncNamespace(ns string) (err error) {
