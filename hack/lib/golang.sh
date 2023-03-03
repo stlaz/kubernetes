@@ -481,7 +481,9 @@ EOF
   local go_version
   IFS=" " read -ra go_version <<< "$(GOFLAGS='' go version)"
   local minimum_go_version
-  minimum_go_version=go1.17.0
+  # we continue to test in the original go version which was go1.17
+  # https://github.com/kubernetes/enhancements/tree/master/keps/sig-release/3744-stay-on-supported-go-versions#proposal
+  minimum_go_version=go1.17
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.
@@ -496,9 +498,6 @@ EOF
 # ${PATH}. It will also check that the Go version is good enough for the
 # Kubernetes build.
 #
-# Inputs:
-#   KUBE_EXTRA_GOPATH - If set, this is included in created GOPATH
-#
 # Outputs:
 #   env-var GOPATH points to our local output dir
 #   env-var GOBIN is unset (we want binaries in a predictable place)
@@ -511,11 +510,6 @@ kube::golang::setup_env() {
 
   export GOPATH="${KUBE_GOPATH}"
   export GOCACHE="${KUBE_GOPATH}/cache"
-
-  # Append KUBE_EXTRA_GOPATH to the GOPATH if it is defined.
-  if [[ -n ${KUBE_EXTRA_GOPATH:-} ]]; then
-    GOPATH="${GOPATH}:${KUBE_EXTRA_GOPATH}"
-  fi
 
   # Make sure our own Go binaries are in PATH.
   export PATH="${KUBE_GOPATH}/bin:${PATH}"
