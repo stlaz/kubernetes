@@ -18,6 +18,7 @@ package csimigration
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -247,6 +248,7 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 			csiMigrationCompleteResult:    true,
 		},
 	}
+	os.Setenv("OPENSHIFT_DO_VSPHERE_MIGRATION", "true")
 	csiTranslator := csitrans.New()
 	for _, test := range testCases {
 		pm := NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
