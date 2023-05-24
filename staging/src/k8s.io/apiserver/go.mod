@@ -52,7 +52,7 @@ require (
 	k8s.io/kms v0.26.1
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280
 	k8s.io/utils v0.0.0-20221107191617-1a15be271d1d
-	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.36
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.37
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3
 	sigs.k8s.io/yaml v1.3.0
@@ -112,7 +112,11 @@ require (
 	go.opentelemetry.io/otel/metric v0.31.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
+<<<<<<< HEAD
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
+=======
+	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b // indirect
+>>>>>>> v1.26.5
 	golang.org/x/term v0.6.0 // indirect
 	golang.org/x/text v0.8.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect

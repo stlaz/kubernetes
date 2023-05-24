@@ -81,7 +81,11 @@ require (
 	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/mod v0.8.0 // indirect
 	golang.org/x/net v0.8.0 // indirect
+<<<<<<< HEAD
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
+=======
+	golang.org/x/oauth2 v0.0.0-20220223155221-ee480838109b // indirect
+>>>>>>> v1.26.5
 	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/sys v0.6.0 // indirect
 	golang.org/x/term v0.6.0 // indirect
@@ -99,8 +103,13 @@ require (
 	k8s.io/api v0.26.1 // indirect
 	k8s.io/gengo v0.0.0-20220902162205-c0856e24416d // indirect
 	k8s.io/klog/v2 v2.80.1 // indirect
+<<<<<<< HEAD
 	k8s.io/kms v0.26.1 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.36 // indirect
+=======
+	k8s.io/kms v0.0.0 // indirect
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.37 // indirect
+>>>>>>> v1.26.5
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
