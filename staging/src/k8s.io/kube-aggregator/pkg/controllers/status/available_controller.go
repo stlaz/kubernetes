@@ -90,13 +90,10 @@ type AvailableConditionController struct {
 	// metrics registered into legacy registry
 	metrics *availabilityMetrics
 
-<<<<<<< HEAD
 	// hasBeenReady is signaled when the readyz endpoint succeeds for the first time.
 	hasBeenReady <-chan struct{}
 }
 
-=======
->>>>>>> v1.26.5
 // NewAvailableConditionController returns a new AvailableConditionController.
 func NewAvailableConditionController(
 	apiServiceInformer informers.APIServiceInformer,
@@ -106,10 +103,7 @@ func NewAvailableConditionController(
 	proxyTransportDial *transport.DialHolder,
 	proxyCurrentCertKeyContent certKeyFunc,
 	serviceResolver ServiceResolver,
-<<<<<<< HEAD
 	hasBeenReady <-chan struct{},
-=======
->>>>>>> v1.26.5
 ) (*AvailableConditionController, error) {
 	c := &AvailableConditionController{
 		apiServiceClient: apiServiceClient,
@@ -129,10 +123,7 @@ func NewAvailableConditionController(
 		proxyTransportDial:         proxyTransportDial,
 		proxyCurrentCertKeyContent: proxyCurrentCertKeyContent,
 		metrics:                    newAvailabilityMetrics(),
-<<<<<<< HEAD
 		hasBeenReady:               hasBeenReady,
-=======
->>>>>>> v1.26.5
 	}
 
 	// resync on this one because it is low cardinality and rechecking the actual discovery
