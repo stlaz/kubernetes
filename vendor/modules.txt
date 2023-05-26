@@ -1249,8 +1249,6 @@ golang.org/x/crypto/pkcs12/internal/rc2
 golang.org/x/crypto/salsa20/salsa
 golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
-# golang.org/x/exp v0.0.0-20210220032938-85be41e4509f => golang.org/x/exp v0.0.0-20210220032938-85be41e4509f
-## explicit; go 1.12
 # golang.org/x/mod v0.8.0 => golang.org/x/mod v0.8.0
 ## explicit; go 1.17
 golang.org/x/mod/internal/lazyregexp
@@ -3111,12 +3109,8 @@ sigs.k8s.io/yaml
 # modernc.org/strutil => modernc.org/strutil v1.0.0
 # modernc.org/xc => modernc.org/xc v1.0.0
 # rsc.io/pdf => rsc.io/pdf v0.1.1
-<<<<<<< HEAD
-# sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.35
-# sigs.k8s.io/controller-tools => sigs.k8s.io/controller-tools v0.2.8
-=======
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.37
->>>>>>> v1.24.14
+# sigs.k8s.io/controller-tools => sigs.k8s.io/controller-tools v0.2.8
 # sigs.k8s.io/json => sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2
 # sigs.k8s.io/kube-storage-version-migrator => sigs.k8s.io/kube-storage-version-migrator v0.0.4
 # sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.11.4
