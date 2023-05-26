@@ -21,15 +21,9 @@ require (
 	github.com/peterbourgon/diskv v2.0.1+incompatible
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.0
-<<<<<<< HEAD
-	golang.org/x/net v0.7.0
-	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5
-	golang.org/x/term v0.5.0
-=======
 	golang.org/x/net v0.8.0
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
 	golang.org/x/term v0.6.0
->>>>>>> v1.24.14
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
 	google.golang.org/protobuf v1.27.1
 	k8s.io/api v0.24.0

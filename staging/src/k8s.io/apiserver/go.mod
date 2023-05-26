@@ -105,15 +105,9 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v0.20.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
-<<<<<<< HEAD
-	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
-	golang.org/x/term v0.5.0 // indirect
-	golang.org/x/text v0.7.0 // indirect
-=======
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect
 	golang.org/x/term v0.6.0 // indirect
 	golang.org/x/text v0.8.0 // indirect
->>>>>>> v1.24.14
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220107163113-42d7afdf6368 // indirect
