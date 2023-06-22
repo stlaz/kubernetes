@@ -14,8 +14,13 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/go-cmp v0.5.8
+<<<<<<< HEAD
 	github.com/google/gofuzz v1.2.0
 	github.com/google/uuid v1.1.2
+=======
+	github.com/google/gofuzz v1.1.0
+	github.com/google/uuid v1.3.0
+>>>>>>> v1.25.11
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/openshift/library-go v0.0.0-20221205131816-1700fb06ea43
