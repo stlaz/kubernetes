@@ -19,15 +19,9 @@ require (
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/rubiojr/go-vhd v0.0.0-20200706105327-02e210299021
 	github.com/stretchr/testify v1.8.0
-<<<<<<< HEAD
-	github.com/vmware/govmomi v0.20.3
-	golang.org/x/crypto v0.0.0-20220331220935-ae2d96664a29
-	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5
-=======
 	github.com/vmware/govmomi v0.30.0
 	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd
 	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
->>>>>>> v1.25.11
 	google.golang.org/api v0.60.0
 	gopkg.in/gcfg.v1 v1.2.0
 	k8s.io/api v0.25.0
@@ -66,13 +60,8 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/gnostic v0.5.7-v3refs // indirect
-<<<<<<< HEAD
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/google/uuid v1.1.2 // indirect
-=======
-	github.com/google/gofuzz v1.1.0 // indirect
 	github.com/google/uuid v1.3.0 // indirect
->>>>>>> v1.25.11
 	github.com/googleapis/gax-go/v2 v2.1.1 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect

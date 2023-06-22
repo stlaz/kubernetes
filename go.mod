@@ -43,13 +43,8 @@ require (
 	github.com/google/cadvisor v0.45.0
 	github.com/google/gnostic v0.5.7-v3refs
 	github.com/google/go-cmp v0.5.8
-<<<<<<< HEAD
 	github.com/google/gofuzz v1.2.0
-	github.com/google/uuid v1.1.2
-=======
-	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.3.0
->>>>>>> v1.25.11
 	github.com/heketi/heketi v10.3.0+incompatible
 	github.com/ishidawataru/sctp v0.0.0-20190723014705-7c296d48a2b5
 	github.com/libopenstorage/openstorage v1.0.0
@@ -303,11 +298,7 @@ replace (
 	github.com/NYTimes/gziphandler => github.com/NYTimes/gziphandler v1.1.1
 	github.com/PuerkitoBio/purell => github.com/PuerkitoBio/purell v1.1.1
 	github.com/PuerkitoBio/urlesc => github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
-<<<<<<< HEAD
-	github.com/RangelReale/osincli => github.com/RangelReale/osincli v0.0.0-20160924135400-fababb0555f2
-=======
 	github.com/a8m/tree => github.com/a8m/tree v0.0.0-20210115125333-10a5fd5b637d
->>>>>>> v1.25.11
 	github.com/ajstarks/svgo => github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af
 	github.com/antihax/optional => github.com/antihax/optional v1.0.0
 	github.com/antlr/antlr4/runtime/Go/antlr => github.com/antlr/antlr4/runtime/Go/antlr v0.0.0-20220418222510-f25a4f6275ed
