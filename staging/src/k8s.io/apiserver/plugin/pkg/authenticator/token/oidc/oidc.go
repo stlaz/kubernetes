@@ -601,7 +601,12 @@ func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*a
 		username = a.usernamePrefix + username
 	}
 
-	info := &user.DefaultInfo{Name: username}
+	var uid string
+	if err := c.unmarshalClaim("sub", &uid); err != nil {
+		return nil, false, fmt.Errorf("oidc: parse the sub claim: %w", err)
+	}
+
+	info := &user.DefaultInfo{UID: uid, Name: username}
 	if a.groupsClaim != "" {
 		if _, ok := c[a.groupsClaim]; ok {
 			// Some admins want to use string claims like "role" as the group value.
