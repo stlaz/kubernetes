@@ -28,7 +28,7 @@ import (
 	"os"
 	"regexp"
 
-	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -59,16 +59,16 @@ var _ = SIGDescribe(feature.ClusterTrustBundle, feature.ClusterTrustBundleProjec
 
 	ginkgo.It("should be able to mount a single ClusterTrustBundle by name", func(ctx context.Context) {
 
-		ctb1 := &certificatesv1alpha1.ClusterTrustBundle{
+		ctb1 := &certificatesv1beta1.ClusterTrustBundle{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "ctb1",
 			},
-			Spec: certificatesv1alpha1.ClusterTrustBundleSpec{
+			Spec: certificatesv1beta1.ClusterTrustBundleSpec{
 				TrustBundle: goodCert1Block,
 			},
 		}
 
-		if _, err := f.ClientSet.CertificatesV1alpha1().ClusterTrustBundles().Create(ctx, ctb1, metav1.CreateOptions{}); err != nil {
+		if _, err := f.ClientSet.CertificatesV1beta1().ClusterTrustBundles().Create(ctx, ctb1, metav1.CreateOptions{}); err != nil {
 			framework.Failf("Error while creating ClusterTrustBundle: %v", err)
 		}
 

@@ -36,7 +36,7 @@ import (
 	autoscalingapiv2 "k8s.io/api/autoscaling/v2"
 	batchapiv1 "k8s.io/api/batch/v1"
 	certificatesapiv1 "k8s.io/api/certificates/v1"
-	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationapiv1 "k8s.io/api/coordination/v1"
 	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
 	apiv1 "k8s.io/api/core/v1"
@@ -479,7 +479,7 @@ var (
 		apiserverinternalv1alpha1.SchemeGroupVersion,
 		coordinationv1alpha1.SchemeGroupVersion,
 		resourceapi.SchemeGroupVersion,
-		certificatesv1alpha1.SchemeGroupVersion,
+		certificatesv1beta1.SchemeGroupVersion,
 		networkingapiv1alpha1.SchemeGroupVersion,
 		storageapiv1alpha1.SchemeGroupVersion,
 		svmv1alpha1.SchemeGroupVersion,
