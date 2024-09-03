@@ -23,14 +23,20 @@ import (
 	"context"
 	"fmt"
 
+	certificatesv1alpha1 "k8s.io/api/certificates/v1alpha1"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/controller-manager/controller"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
 	"k8s.io/kubernetes/pkg/controller/certificates/cleaner"
+	ctbpublisher "k8s.io/kubernetes/pkg/controller/certificates/clustertrustbundlepublisher"
 	"k8s.io/kubernetes/pkg/controller/certificates/rootcacertpublisher"
 	"k8s.io/kubernetes/pkg/controller/certificates/signer"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func newCertificateSigningRequestSigningControllerDescriptor() *ControllerDescriptor {
@@ -222,5 +228,50 @@ func startRootCACertificatePublisherController(ctx context.Context, controllerCo
 		return nil, true, fmt.Errorf("error creating root CA certificate publisher: %v", err)
 	}
 	go sac.Run(ctx, 1)
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundle) {
+		return nil, true, nil
+	}
+
+	apiserverSignerClient := controllerContext.ClientBuilder.ClientOrDie("kube-apiserver-serving-clustertrustbundle-publisher")
+	ctbAvailable, err := clusterTrustBundlesAvailable(apiserverSignerClient)
+	if err != nil {
+		return nil, true, fmt.Errorf("discovery failed for ClusterTrustBundle: %w", err)
+	}
+
+	if !ctbAvailable {
+		return nil, true, nil
+	}
+
+	servingSigners, err := dynamiccertificates.NewStaticCAContent("kube-apiserver-serving", rootCA)
+	if err != nil {
+		return nil, true, fmt.Errorf("failed to create a static CA content provider for the kube-apiserver-serving signer: %w", err)
+	}
+
+	ctbPublisher, err := ctbpublisher.NewClusterTrustBundlePublisher(
+		"kubernetes.io/kube-apiserver-serving",
+		servingSigners,
+		apiserverSignerClient,
+	)
+	if err != nil {
+		return nil, true, fmt.Errorf("error creating kube-apiserver-serving signer certificates publisher: %w", err)
+	}
+
+	go ctbPublisher.Run(ctx)
 	return nil, true, nil
+}
+
+func clusterTrustBundlesAvailable(client kubernetes.Interface) (bool, error) {
+	resList, err := client.Discovery().ServerResourcesForGroupVersion(certificatesv1alpha1.SchemeGroupVersion.String())
+
+	if resList != nil {
+		// even in case of an error above there might be a partial list for APIs that
+		// were already successfully discovered
+		for _, r := range resList.APIResources {
+			if r.Name == "clustertrustbundles" {
+				return true, nil
+			}
+		}
+	}
+	return false, err
 }
