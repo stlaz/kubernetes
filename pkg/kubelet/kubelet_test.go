@@ -3211,6 +3211,7 @@ func TestSyncPodSpans(t *testing.T) {
 		kubeCfg.CPUCFSQuotaPeriod,
 		runtimeSvc,
 		imageSvc,
+		nil, // FIXME
 		kubelet.containerManager,
 		kubelet.containerLogManager,
 		kubelet.runtimeClassManager,

@@ -48,7 +48,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/credentialprovider/plugin"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -106,9 +105,6 @@ type kubeGenericRuntimeManager struct {
 	// Container GC manager
 	containerGC *containerGC
 
-	// Keyring for pulling images
-	keyring credentialprovider.DockerKeyring
-
 	// Runner of lifecycle events.
 	runner kubecontainer.HandlerRunner
 
@@ -132,6 +128,10 @@ type kubeGenericRuntimeManager struct {
 	// gRPC service clients
 	runtimeService internalapi.RuntimeService
 	imageService   internalapi.ImageManagerService
+
+	// keeps information about image pulls and enforces credential verification
+	// for image pulls between node tenants
+	imagePullManager images.ImagePullManager
 
 	// The version cache of runtime daemon.
 	versionCache *cache.ObjectCache
@@ -204,6 +204,7 @@ func NewKubeGenericRuntimeManager(
 	cpuCFSQuotaPeriod metav1.Duration,
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
+	imagePullManager images.ImagePullManager,
 	containerManager cm.ContainerManager,
 	logManager logs.ContainerLogManager,
 	runtimeClassManager *runtimeclass.Manager,
@@ -231,6 +232,7 @@ func NewKubeGenericRuntimeManager(
 		runtimeHelper:          runtimeHelper,
 		runtimeService:         runtimeService,
 		imageService:           imageService,
+		imagePullManager:       imagePullManager,
 		containerManager:       containerManager,
 		internalLifecycle:      containerManager.InternalContainerLifecycle(),
 		logManager:             logManager,
@@ -270,7 +272,6 @@ func NewKubeGenericRuntimeManager(
 			os.Exit(1)
 		}
 	}
-	kubeRuntimeManager.keyring = credentialprovider.NewDockerKeyring()
 
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),
