@@ -206,16 +206,9 @@ func newRootCACertificatePublisherControllerDescriptor() *ControllerDescriptor {
 }
 
 func startRootCACertificatePublisherController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
-	var (
-		rootCA []byte
-		err    error
-	)
-	if controllerContext.ComponentConfig.SAController.RootCAFile != "" {
-		if rootCA, err = readCA(controllerContext.ComponentConfig.SAController.RootCAFile); err != nil {
-			return nil, true, fmt.Errorf("error parsing root-ca-file at %s: %v", controllerContext.ComponentConfig.SAController.RootCAFile, err)
-		}
-	} else {
-		rootCA = controllerContext.ClientBuilder.ConfigOrDie("root-ca-cert-publisher").CAData
+	rootCA, err := getKubeAPIServerCAFileContents(controllerContext)
+	if err != nil {
+		return nil, true, err
 	}
 
 	sac, err := rootcacertpublisher.NewPublisher(
@@ -228,9 +221,25 @@ func startRootCACertificatePublisherController(ctx context.Context, controllerCo
 		return nil, true, fmt.Errorf("error creating root CA certificate publisher: %v", err)
 	}
 	go sac.Run(ctx, 1)
+	return nil, true, nil
+}
 
+func newKubeAPIServerSignerClusterTrustBundledPublisherDescriptor() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.KubeAPIServerClusterTrustBundlePublisherController,
+		aliases:  []string{"kube-apiserver-serving-clustertrustbundle-publisher"},
+		initFunc: newKubeAPIServerSignerClusterTrustBundledPublisherController,
+	}
+}
+
+func newKubeAPIServerSignerClusterTrustBundledPublisherController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundle) {
 		return nil, true, nil
+	}
+
+	rootCA, err := getKubeAPIServerCAFileContents(controllerContext)
+	if err != nil {
+		return nil, true, err
 	}
 
 	apiserverSignerClient := controllerContext.ClientBuilder.ClientOrDie("kube-apiserver-serving-clustertrustbundle-publisher")
@@ -274,4 +283,20 @@ func clusterTrustBundlesAvailable(client kubernetes.Interface) (bool, error) {
 		}
 	}
 	return false, err
+}
+
+func getKubeAPIServerCAFileContents(controllerContext ControllerContext) ([]byte, error) {
+	var (
+		rootCA []byte
+		err    error
+	)
+	if controllerContext.ComponentConfig.SAController.RootCAFile != "" {
+		if rootCA, err = readCA(controllerContext.ComponentConfig.SAController.RootCAFile); err != nil {
+			return nil, fmt.Errorf("error parsing root-ca-file at %s: %v", controllerContext.ComponentConfig.SAController.RootCAFile, err)
+		}
+	} else {
+		rootCA = controllerContext.ClientBuilder.ConfigOrDie("root-ca-cert-publisher").CAData
+	}
+
+	return rootCA, nil
 }
