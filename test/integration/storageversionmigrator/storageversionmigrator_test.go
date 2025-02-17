@@ -19,24 +19,39 @@ package storageversionmigrator
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"reflect"
+	"sort"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
 
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.uber.org/goleak"
 
 	svmv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
+	endpointsdiscovery "k8s.io/apiserver/pkg/endpoints/discovery"
 	encryptionconfigcontroller "k8s.io/apiserver/pkg/server/options/encryptionconfig/controller"
 	etcd3watcher "k8s.io/apiserver/pkg/storage/etcd3"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/dynamic"
 	clientgofeaturegate "k8s.io/client-go/features"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog/v2/ktesting"
+	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/integration"
+	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // TestStorageVersionMigration is an integration test that verifies storage version migration works.
@@ -56,9 +71,7 @@ func TestStorageVersionMigration(t *testing.T) {
 	// this makes the test super responsive. It's set to a default of 1 minute.
 	encryptionconfigcontroller.EncryptionConfigFileChangePollDuration = time.Second
 
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	ctx := ktesting.Init(t)
 
 	svmTest := svmSetup(ctx, t)
 
@@ -163,9 +176,7 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 		goleak.IgnoreTopFunction("github.com/moby/spdystream.(*Connection).shutdown"),
 	)
 
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	ctx := ktesting.Init(t)
 
 	crVersions := make(map[string]versions)
 
@@ -281,6 +292,258 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 	}
 }
 
+func TestCRDDiscoveryStorageRace(t *testing.T) {
+	testCtx := ktesting.Init(t)
+
+	etcdStorage := framework.SharedEtcd()
+	testKAS := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, etcdStorage)
+	defer testKAS.TearDownFn()
+
+	etcdClient, _, err := integration.GetEtcdClients(testKAS.ServerOpts.Etcd.StorageConfig.Transport)
+	if err != nil {
+		t.Fatalf("failed to retrieve etcd client: %v", err)
+	}
+	defer etcdClient.Close()
+
+	kubeClient := kubernetes.NewForConfigOrDie(testKAS.ClientConfig)
+	apiExtensionClient := apiextensionsclient.NewForConfigOrDie(testKAS.ClientConfig)
+	dynamicClient := dynamic.NewForConfigOrDie(testKAS.ClientConfig)
+
+	testCRDResourceNameFmt := "testcrd"
+	testCRDGroup := "crdstorage.test.k8s.io"
+	testCRDTpl := &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{"api-approved.kubernetes.io": "unapproved, test-only"},
+		},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: testCRDGroup,
+			Scope: apiextensionsv1.NamespaceScoped,
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v2",
+					Served:  true,
+					Storage: false,
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensionsv1.JSONSchemaProps{
+								"host": {Type: "string"},
+								"port": {Type: "string"},
+							},
+						},
+					},
+				},
+				{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensionsv1.JSONSchemaProps{
+								"hostPort": {Type: "string"},
+							},
+						},
+					},
+				},
+			},
+			PreserveUnknownFields: false,
+		},
+	}
+
+	turnOnV2Storage := func(crd *apiextensionsv1.CustomResourceDefinition) *apiextensionsv1.CustomResourceDefinition {
+		crd.Spec.Versions = []apiextensionsv1.CustomResourceDefinitionVersion{
+			{
+				Name:    "v2",
+				Served:  true,
+				Storage: true,
+				Schema: &apiextensionsv1.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+						Type: "object",
+						Properties: map[string]apiextensionsv1.JSONSchemaProps{
+							"host": {Type: "string"},
+							"port": {Type: "string"},
+						},
+					},
+				},
+			},
+			{
+				Name:    "v1",
+				Served:  true,
+				Storage: false,
+				Schema: &apiextensionsv1.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+						Type: "object",
+						Properties: map[string]apiextensionsv1.JSONSchemaProps{
+							"hostPort": {Type: "string"},
+						},
+					},
+				},
+			},
+		}
+		return crd
+	}
+
+	getResFromEtcd := func(t *testing.T, path string) *unstructured.Unstructured {
+		response, err := etcdClient.Get(context.Background(), path, clientv3.WithPrefix())
+		if err != nil {
+			t.Fatalf("failed to retrieve resource from etcd %v", err)
+		}
+
+		// parse data to unstructured.Unstructured
+		obj := &unstructured.Unstructured{}
+		err = obj.UnmarshalJSON(response.Kvs[0].Value)
+		if err != nil {
+			t.Fatalf("Failed to unmarshal data to unstructured: %v", err)
+		}
+
+		return obj
+	}
+
+	discoveredV2Storage := func(resourceKind string) (bool, error) {
+		apiGroups, _, err := kubeClient.Discovery().ServerGroupsAndResources()
+		if err != nil {
+			return false, fmt.Errorf("failed to get server groups and resources: %w", err)
+		}
+
+		expectedStorageHash := endpointsdiscovery.StorageVersionHash(testCRDGroup, "v2", resourceKind)
+
+		for _, api := range apiGroups {
+			if api.Name != testCRDGroup {
+				continue
+			}
+			var servingVersions []string
+			for _, apiVersion := range api.Versions {
+				servingVersions = append(servingVersions, apiVersion.Version)
+			}
+			sort.Strings(servingVersions)
+
+			// Check if the serving versions are as expected
+			if !reflect.DeepEqual(servingVersions, []string{"v1", "v2"}) {
+				continue
+			}
+
+			resourceList, err := kubeClient.Discovery().ServerResourcesForGroupVersion(testCRDGroup + "/" + api.PreferredVersion.Version)
+			if err != nil {
+				return false, fmt.Errorf("failed to get server resources for group version: %w", err)
+			}
+
+			// Check if the storage version is as expected
+			for _, resource := range resourceList.APIResources {
+				if resource.Kind == resourceKind && resource.StorageVersionHash == expectedStorageHash {
+					return true, nil
+				}
+			}
+		}
+		return false, nil
+	}
+
+	wg := sync.WaitGroup{}
+	for testnum := range 100 {
+		wg.Add(1)
+		go t.Run(fmt.Sprintf("run %d", testnum), func(t *testing.T) {
+			defer wg.Done()
+			ctx := ktesting.WithCancel(testCtx)
+
+			resName := testCRDResourceNameFmt + strconv.Itoa(testnum)
+			resNamePlural := resName + "s"
+
+			// Step 1: Create a CRD for the test
+			crdRes := testCRDTpl.DeepCopy()
+			crdRes.Name = resNamePlural + "." + testCRDGroup
+			crdRes.Spec.Names = apiextensionsv1.CustomResourceDefinitionNames{
+				Kind:     resName,
+				ListKind: resName + "List",
+				Plural:   resNamePlural,
+				Singular: resName,
+			}
+
+			etcd.CreateTestCRDs(t, apiExtensionClient, false, crdRes)
+
+			// Step 2: create a CR for the CRD GV and make sure it's stored in v1 storage
+			gv := schema.GroupVersionResource{
+				Group:    testCRDGroup,
+				Version:  "v1",
+				Resource: resNamePlural,
+			}
+			crObject := &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": gv.GroupVersion().String(),
+					"kind":       resName,
+					"metadata": map[string]interface{}{
+						"name":      "testobj-prev2",
+						"namespace": "default",
+					},
+				},
+			}
+			_, err = dynamicClient.Resource(gv).Namespace(defaultNamespace).Create(ctx, crObject, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create CR: %v", err)
+			}
+
+			// Step 3: check we're storing the resource at the expected path
+			etcdPath := fmt.Sprintf("/%s/%s/%s/%s/%s", etcdStorage.Prefix, testCRDGroup, resNamePlural, "default", "testobj-prev2")
+			etcdObj := getResFromEtcd(t, etcdPath)
+
+			if etcdObj.GetAPIVersion() != fmt.Sprintf("%s/%s", testCRDGroup, "v1") {
+				t.Fatalf("a resource was not stored as v1 after CRD init")
+			}
+
+			// Step 4: switch the storage to use v2 instead of v1
+			crdRes, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, crdRes.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("failed to retrieve CRD: %v", err)
+			}
+			_, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Update(ctx, turnOnV2Storage(crdRes), metav1.UpdateOptions{})
+			if err != nil {
+				t.Fatalf("failed to update CRD for v2 storage: %v", err)
+			}
+
+			// Step 5: wait for discovery to broadcast v2 as the storage version
+			err := wait.PollUntilContextTimeout(
+				ctx,
+				500*time.Millisecond,
+				time.Second*60,
+				true,
+				func(ctx context.Context) (done bool, err error) {
+					ok, err := discoveredV2Storage(resName)
+					if err != nil {
+						return false, fmt.Errorf("discovery failed: %w", err)
+					}
+					return ok, nil
+				})
+
+			if err != nil {
+				t.Fatalf("failed waiting for discovery: %v", err)
+			}
+
+			// Step 6: create a new resource, expecting it to be in v2 storage
+			crObject = &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": gv.GroupVersion().String(),
+					"kind":       resName,
+					"metadata": map[string]interface{}{
+						"name":      "testobj-postv2",
+						"namespace": "default",
+					},
+				},
+			}
+			_, err = dynamicClient.Resource(gv).Namespace(defaultNamespace).Create(ctx, crObject, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create CR: %v", err)
+			}
+
+			etcdPath = fmt.Sprintf("/%s/%s/%s/%s/%s", etcdStorage.Prefix, testCRDGroup, resNamePlural, "default", "testobj-postv2")
+			etcdObj = getResFromEtcd(t, etcdPath)
+
+			if etcdObj.GetAPIVersion() != fmt.Sprintf("%s/%s", testCRDGroup, "v2") {
+				t.Fatalf("a resource was not stored as v2 after CRD update")
+			}
+		})
+	}
+	wg.Wait()
+}
+
 // TestStorageVersionMigrationDuringChaos serves as a stress test for the SVM controller.
 // It creates a CRD and a reasonable number of static instances for that resource.
 // It also continuously creates and deletes instances of that resource.
@@ -291,9 +554,7 @@ func TestStorageVersionMigrationDuringChaos(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageVersionMigrator, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, featuregate.Feature(clientgofeaturegate.InformerResourceVersion), true)
 
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	t.Cleanup(cancel)
+	ctx := ktesting.Init(t)
 
 	svmTest := svmSetup(ctx, t)
 
