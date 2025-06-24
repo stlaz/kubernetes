@@ -17,220 +17,260 @@ limitations under the License.
 package pullmanager
 
 import (
-	"slices"
-	"strings"
 	"sync"
+	"sync/atomic"
 
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/utils/lru"
 )
+
+type lruCache[K comparable, V any] struct {
+	cache   *lru.Cache
+	maxSize int
+
+	// authoritative indicates if the we can consider the cached records an
+	// authoritative source.
+	// False if the cache is full or if there were errors during its initialization.
+	authoritative atomic.Bool
+
+	// ignoreEvictionKeys is a set of keys for which we should't modify the cache's
+	// authoritative status during eviction.
+	// Each key can only prevent eviction once.
+	ignoreEvictionKeys sync.Map
+}
+
+func newLRUCache[K comparable, V any](size int) *lruCache[K, V] {
+	c := lru.New(size)
+	l := &lruCache[K, V]{
+		maxSize:            size,
+		cache:              c,
+		ignoreEvictionKeys: sync.Map{},
+	}
+	c.SetEvictionFunc(func(key lru.Key, _ any) {
+		// each key is only valid once
+		if _, shouldIgnore := l.ignoreEvictionKeys.Load(key); shouldIgnore {
+			return
+		}
+		// any eviction makes our cache non-authoritative
+		l.authoritative.Store(false)
+	})
+	return l
+}
+
+func (c *lruCache[K, V]) Get(key K) (*V, bool) {
+	value, found := c.cache.Get(key)
+	if !found {
+		return nil, false
+	}
+	if value == nil {
+		return nil, true
+	}
+	return value.(*V), true
+}
+
+func (c *lruCache[K, V]) Set(key K, value *V) { c.cache.Add(key, value) }
+func (c *lruCache[K, V]) Delete(key K)        { c.cache.Remove(key) }
+func (c *lruCache[K, V]) Len() int            { return c.cache.Len() }
+func (c *lruCache[K, V]) Clear()              { c.cache.Clear() }
+
+// NoEvictionDeleteLocked will prevent authoritative cache status changes.
+//
+// Must be called locked with an external write lock.
+func (c *lruCache[K, V]) NoEvictionDeleteLocked(key K) {
+	c.ignoreEvictionKeys.Store(key, struct{}{})
+	defer c.ignoreEvictionKeys.Delete(key)
+	c.Delete(key)
+}
 
 // cachedPullRecordsAccessor implements a write-through cache layer on top
 // of another PullRecordsAccessor
 type cachedPullRecordsAccessor struct {
 	delegate PullRecordsAccessor
 
-	intentsMutex    *sync.RWMutex
-	intents         map[string]*kubeletconfiginternal.ImagePullIntent
-	intentListError error
-
-	pulledRecordsMutex     *sync.RWMutex
-	pulledRecords          map[string]*kubeletconfiginternal.ImagePulledRecord
-	pulledRecordsListError error
+	intentsLocks       *StripedLockSet
+	intents            *lruCache[string, kubeletconfiginternal.ImagePullIntent]
+	pulledRecordsLocks *StripedLockSet
+	pulledRecords      *lruCache[string, kubeletconfiginternal.ImagePulledRecord]
 }
 
-func NewCachedPullRecordsAccessor(delegate PullRecordsAccessor) *cachedPullRecordsAccessor {
-	coldIntents, intentListError := delegate.ListImagePullIntents()
-	cachedIntents := make(map[string]*kubeletconfiginternal.ImagePullIntent, len(coldIntents))
-	for _, intent := range coldIntents {
-		cachedIntents[intent.Image] = intent
-	}
+func NewCachedPullRecordsAccessor(delegate PullRecordsAccessor, intentsCacheSize, pulledRecordsCacheSize, stripedLocksSize int32) *cachedPullRecordsAccessor {
+	intentsCacheSize = min(intentsCacheSize, 1024)
+	pulledRecordsCacheSize = min(pulledRecordsCacheSize, 2000)
 
-	coldPulledRecords, pulledRecordsListError := delegate.ListImagePulledRecords()
-	cachedPulledRecords := make(map[string]*kubeletconfiginternal.ImagePulledRecord, len(coldPulledRecords))
-	for _, pulledRecord := range coldPulledRecords {
-		cachedPulledRecords[pulledRecord.ImageRef] = pulledRecord
-	}
-
-	return &cachedPullRecordsAccessor{
+	c := &cachedPullRecordsAccessor{
 		delegate: delegate,
 
-		intentsMutex:    &sync.RWMutex{},
-		intents:         cachedIntents,
-		intentListError: intentListError,
-
-		pulledRecordsMutex:     &sync.RWMutex{},
-		pulledRecords:          cachedPulledRecords,
-		pulledRecordsListError: pulledRecordsListError,
+		intentsLocks:       NewStripedLockSet(stripedLocksSize),
+		intents:            newLRUCache[string, kubeletconfiginternal.ImagePullIntent](int(intentsCacheSize)),
+		pulledRecordsLocks: NewStripedLockSet(stripedLocksSize),
+		pulledRecords:      newLRUCache[string, kubeletconfiginternal.ImagePulledRecord](int(pulledRecordsCacheSize)),
 	}
+	// warm our caches and set authoritative
+	c.ListImagePullIntents()
+	c.ListImagePulledRecords()
+	return c
 }
 
 func (c *cachedPullRecordsAccessor) ListImagePullIntents() ([]*kubeletconfiginternal.ImagePullIntent, error) {
-	return genericList(
-		c.intentsMutex,
+	return cacheRefreshingList(
+		c.intents,
+		c.intentsLocks,
 		c.delegate.ListImagePullIntents,
-		pullIntentToMapKey,
-		pullIntentsCmp,
-		&c.intentListError,
-		&c.intents,
+		pullIntentToCacheKey,
 	)
 }
 
 func (c *cachedPullRecordsAccessor) ImagePullIntentExists(image string) (bool, error) {
-	var exists bool
-	func() {
-		c.intentsMutex.RLock()
-		defer c.intentsMutex.RUnlock()
-
-		_, exists = c.intents[image]
-	}()
-	if exists {
+	// do the cheap Get() lock-free
+	if _, exists := c.intents.Get(image); exists {
 		return true, nil
 	}
 
-	c.intentsMutex.Lock()
-	defer c.intentsMutex.Unlock()
+	// on a miss, lock on the image
+	c.intentsLocks.Lock(image)
+	defer c.intentsLocks.Unlock(image)
 
+	// check again if the image exists in the cache under image lock
+	if _, exists := c.intents.Get(image); exists {
+		return true, nil
+	}
+	// if the cache is authoritative, return false on a miss
+	if c.intents.authoritative.Load() {
+		return false, nil
+	}
+
+	// fall through to the expensive lookup
 	exists, err := c.delegate.ImagePullIntentExists(image)
 	if err == nil && exists {
-		c.intents[image] = &kubeletconfiginternal.ImagePullIntent{
+		c.intents.Set(image, &kubeletconfiginternal.ImagePullIntent{
 			Image: image,
-		}
+		})
 	}
 	return exists, err
 }
 
 func (c *cachedPullRecordsAccessor) WriteImagePullIntent(image string) error {
-	c.intentsMutex.Lock()
-	defer c.intentsMutex.Unlock()
+	c.intentsLocks.Lock(image)
+	defer c.intentsLocks.Unlock(image)
 
 	if err := c.delegate.WriteImagePullIntent(image); err != nil {
 		return err
 	}
-	c.intents[image] = &kubeletconfiginternal.ImagePullIntent{
+	c.intents.Set(image, &kubeletconfiginternal.ImagePullIntent{
 		Image: image,
-	}
+	})
+
 	return nil
 }
 
 func (c *cachedPullRecordsAccessor) DeleteImagePullIntent(image string) error {
-	c.intentsMutex.Lock()
-	defer c.intentsMutex.Unlock()
+	c.intentsLocks.Lock(image)
+	defer c.intentsLocks.Unlock(image)
 
 	if err := c.delegate.DeleteImagePullIntent(image); err != nil {
 		return err
 	}
-	delete(c.intents, image)
+	c.intents.NoEvictionDeleteLocked(image)
 	return nil
 }
 
 func (c *cachedPullRecordsAccessor) ListImagePulledRecords() ([]*kubeletconfiginternal.ImagePulledRecord, error) {
-	return genericList(
-		c.pulledRecordsMutex,
+	return cacheRefreshingList(
+		c.pulledRecords,
+		c.pulledRecordsLocks,
 		c.delegate.ListImagePulledRecords,
-		pulledRecordToMapKey,
-		pulledRecordsCmp,
-		&c.pulledRecordsListError,
-		&c.pulledRecords,
+		pulledRecordToCacheKey,
 	)
 }
 
 func (c *cachedPullRecordsAccessor) GetImagePulledRecord(imageRef string) (*kubeletconfiginternal.ImagePulledRecord, bool, error) {
-	var pulledRecord *kubeletconfiginternal.ImagePulledRecord
-	var exists bool
-
-	func() {
-		c.pulledRecordsMutex.RLock()
-		defer c.pulledRecordsMutex.RUnlock()
-
-		pulledRecord, exists = c.pulledRecords[imageRef]
-	}()
+	// do the cheap Get() lock-free
+	pulledRecord, exists := c.pulledRecords.Get(imageRef)
 	if exists {
 		return pulledRecord, true, nil
 	}
 
-	c.pulledRecordsMutex.Lock()
-	defer c.pulledRecordsMutex.Unlock()
+	// on a miss, lock on the imageRef
+	c.pulledRecordsLocks.Lock(imageRef)
+	defer c.pulledRecordsLocks.Unlock(imageRef)
 
+	// check again if the imageRef exists in the cache under imageRef lock
+	pulledRecord, exists = c.pulledRecords.Get(imageRef)
+	if exists {
+		return pulledRecord, true, nil
+	}
+	// if the cache is authoritative, return false on a miss
+	if c.pulledRecords.authoritative.Load() {
+		return nil, false, nil
+	}
+
+	// fall through to the expensive lookup
 	pulledRecord, exists, err := c.delegate.GetImagePulledRecord(imageRef)
-	if err == nil && exists && pulledRecord != nil {
-		c.pulledRecords[imageRef] = pulledRecord
+	if err == nil && exists {
+		c.pulledRecords.Set(imageRef, pulledRecord)
 	}
 	return pulledRecord, exists, err
 }
 
 func (c *cachedPullRecordsAccessor) WriteImagePulledRecord(record *kubeletconfiginternal.ImagePulledRecord) error {
-	c.pulledRecordsMutex.Lock()
-	defer c.pulledRecordsMutex.Unlock()
+	c.pulledRecordsLocks.Lock(record.ImageRef)
+	defer c.pulledRecordsLocks.Unlock(record.ImageRef)
 
 	if err := c.delegate.WriteImagePulledRecord(record); err != nil {
 		return err
 	}
-	c.pulledRecords[record.ImageRef] = record
+	c.pulledRecords.Set(record.ImageRef, record)
 	return nil
 }
 
 func (c *cachedPullRecordsAccessor) DeleteImagePulledRecord(imageRef string) error {
-	c.pulledRecordsMutex.Lock()
-	defer c.pulledRecordsMutex.Unlock()
+	c.pulledRecordsLocks.Lock(imageRef)
+	defer c.pulledRecordsLocks.Unlock(imageRef)
 
 	if err := c.delegate.DeleteImagePulledRecord(imageRef); err != nil {
 		return err
 	}
-	delete(c.pulledRecords, imageRef)
+	c.pulledRecords.NoEvictionDeleteLocked(imageRef)
 	return nil
 }
 
-func pullIntentToMapKey(i *kubeletconfiginternal.ImagePullIntent) string     { return i.Image }
-func pulledRecordToMapKey(i *kubeletconfiginternal.ImagePulledRecord) string { return i.ImageRef }
-func pullIntentsCmp(a, b *kubeletconfiginternal.ImagePullIntent) int {
-	return strings.Compare(a.Image, b.Image)
-}
-func pulledRecordsCmp(a, b *kubeletconfiginternal.ImagePulledRecord) int {
-	return strings.Compare(a.ImageRef, b.ImageRef)
-}
-
-func genericList[K comparable, V any](
-	lock *sync.RWMutex,
-	delegateList func() ([]V, error),
-	toKey func(V) K,
-	cmpFunc func(a, b V) int,
-	previousError *error,
-	cache *map[K]V,
-) ([]V, error) {
-
-	var ret []V = nil
-	func() {
-		lock.RLock()
-		defer lock.RUnlock()
-
-		// if there was an error during previous listing, we should retry delegateList() again
-		if *previousError != nil {
-			return
-		}
-
-		ret = make([]V, 0, len(*cache))
-		for _, intent := range *cache {
-			intent := intent
-			ret = append(ret, intent)
-		}
-
-		// we're using an unstable sort since no two records should ever be the same
-		slices.SortFunc(ret, cmpFunc)
-	}()
-
-	if ret != nil {
-		return ret, nil
+func cacheRefreshingList[K comparable, V any](
+	cache *lruCache[K, V],
+	delegateLocks *StripedLockSet,
+	listRecordsFunc func() ([]*V, error),
+	recordToKey func(*V) K,
+) ([]*V, error) {
+	wasAuthoritative := cache.authoritative.Load()
+	if !wasAuthoritative {
+		// doing a full list gives us an opportunity to become authoritative
+		// if we get back an error-free result that fits in our cache
+		delegateLocks.GlobalLock()
+		defer delegateLocks.GlobalUnlock()
 	}
 
-	lock.Lock()
-	defer lock.Unlock()
-
-	objList, err := delegateList()
-	newCache := make(map[K]V, len(objList))
-	for _, item := range objList {
-		newCache[toKey(item)] = item
+	results, err := listRecordsFunc()
+	if wasAuthoritative {
+		return results, err
 	}
-	*cache = newCache
-	*previousError = err
-	return objList, err
+
+	resultsAreAuthoritative := err == nil && len(results) < cache.maxSize
+	// populate the cache if that would make our cache authoritative or if the cache is currently empty
+	if resultsAreAuthoritative || cache.Len() == 0 {
+		cache.Clear()
+		// populate up to maxSize results in the cache
+		for _, record := range results[:min(len(results), cache.maxSize)] {
+			cache.Set(recordToKey(record), record)
+		}
+		cache.authoritative.Store(resultsAreAuthoritative)
+	}
+
+	return results, err
+}
+
+func pullIntentToCacheKey(intent *kubeletconfiginternal.ImagePullIntent) string {
+	return intent.Image
+}
+
+func pulledRecordToCacheKey(record *kubeletconfiginternal.ImagePulledRecord) string {
+	return record.ImageRef
 }

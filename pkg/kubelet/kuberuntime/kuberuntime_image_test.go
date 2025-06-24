@@ -316,7 +316,7 @@ func TestPullWithSecrets(t *testing.T) {
 		if err != nil {
 			t.Fatal("failed to setup an file pull records accessor")
 		}
-		memCacheRecordsAccessor := imagepullmanager.NewCachedPullRecordsAccessor(fsRecordAccessor)
+		memCacheRecordsAccessor := imagepullmanager.NewCachedPullRecordsAccessor(fsRecordAccessor, 50, 100, 10)
 
 		imagePullManager, err := imagepullmanager.NewImagePullManager(context.Background(), memCacheRecordsAccessor, imagepullmanager.AlwaysVerifyImagePullPolicy(), fakeManager, 10)
 		if err != nil {
@@ -391,7 +391,7 @@ func TestPullWithSecretsWithError(t *testing.T) {
 			if err != nil {
 				t.Fatal("failed to setup an file pull records accessor")
 			}
-			memCacheRecordsAccessor := imagepullmanager.NewCachedPullRecordsAccessor(fsRecordAccessor)
+			memCacheRecordsAccessor := imagepullmanager.NewCachedPullRecordsAccessor(fsRecordAccessor, 50, 100, 10)
 
 			imagePullManager, err := imagepullmanager.NewImagePullManager(context.Background(), memCacheRecordsAccessor, imagepullmanager.AlwaysVerifyImagePullPolicy(), fakeManager, 10)
 			if err != nil {

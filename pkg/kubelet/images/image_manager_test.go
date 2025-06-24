@@ -1132,9 +1132,9 @@ func prepareMemCachedImagePullManager(ctx context.Context, b *testing.B, imageSe
 		b.Fatalf("failed to set up FS-cache accessor: %v", err)
 	}
 
-	cachedAccessor := pullmanager.NewCachedPullRecordsAccessor(fsAccessor)
+	cachedAccessor := pullmanager.NewCachedPullRecordsAccessor(fsAccessor, 50, 100, 10)
 
-	pullManager, err := pullmanager.NewImagePullManager(ctx, cachedAccessor, pullmanager.AlwaysVerifyImagePullPolicy(), imageService, 10) // FIXME: variable for striped locks size
+	pullManager, err := pullmanager.NewImagePullManager(ctx, cachedAccessor, pullmanager.AlwaysVerifyImagePullPolicy(), imageService, 10)
 	if err != nil {
 		b.Fatalf("failed to set up image pull manager: %v", err)
 	}
