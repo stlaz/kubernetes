@@ -299,7 +299,7 @@ func TestNewCachedPullRecordsAccessor(t *testing.T) {
 			gotAccessor := NewCachedPullRecordsAccessor(tt.delegate, 50, 100, 10)
 
 			expectedCachedIntents := tt.wantCacheIntents
-			if err := cmpRecordsMapAndCache(expectedCachedIntents, gotAccessor.intents); err != nil {
+			if err := cmpRecordsMapAndCache(expectedCachedIntents, gotAccessor.Intents); err != nil {
 				t.Errorf("NewCachedPullRecordsAccessor cache does not match: %v", err)
 			}
 
@@ -312,7 +312,7 @@ func TestNewCachedPullRecordsAccessor(t *testing.T) {
 				t.Errorf("NewCachedPullRecordsAccessor().ListImagePullIntents() errors don't match = %v, want %v", intentsErr, tt.wantIntentsError)
 			}
 			expectedPulledRecords := tt.wantCachePulledRecords
-			if err := cmpRecordsMapAndCache(expectedPulledRecords, gotAccessor.pulledRecords); err != nil {
+			if err := cmpRecordsMapAndCache(expectedPulledRecords, gotAccessor.PulledRecords); err != nil {
 				t.Errorf("NewCachedPullRecordsAccessor cache does not match: %v", err)
 			}
 
@@ -325,11 +325,11 @@ func TestNewCachedPullRecordsAccessor(t *testing.T) {
 				t.Errorf("NewCachedPullRecordsAccessor().ListImagePullIntents() errors don't match = %v, want %v", pulledRecordsErr, tt.wantPulledRecordsError)
 			}
 
-			if gotIntentsAuthoritative := gotAccessor.intents.authoritative.Load(); gotIntentsAuthoritative != tt.wantIntentsAuthoritative {
+			if gotIntentsAuthoritative := gotAccessor.Intents.Authoritative.Load(); gotIntentsAuthoritative != tt.wantIntentsAuthoritative {
 				t.Errorf("NewCachedPullRecordsAccessor().intents.authoritative = %v, want %v", gotIntentsAuthoritative, tt.wantIntentsAuthoritative)
 			}
 
-			if gotPulledRecordsAuthoritative := gotAccessor.pulledRecords.authoritative.Load(); gotPulledRecordsAuthoritative != tt.wantPulledRecordsAuthoritative {
+			if gotPulledRecordsAuthoritative := gotAccessor.PulledRecords.Authoritative.Load(); gotPulledRecordsAuthoritative != tt.wantPulledRecordsAuthoritative {
 				t.Errorf("NewCachedPullRecordsAccessor().pulledRecords.authoritative = %v, want %v", gotPulledRecordsAuthoritative, tt.wantPulledRecordsAuthoritative)
 			}
 		})
@@ -412,12 +412,12 @@ func Test_cachedPullRecordsAccessor_ListImagePullIntents(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cachedAccessor := &cachedPullRecordsAccessor{
+			cachedAccessor := &CachedPullRecordsAccessor{
 				delegate:     tt.delegate,
 				intentsLocks: NewStripedLockSet(10),
-				intents:      tt.inMemCache,
+				Intents:      tt.inMemCache,
 			}
-			cachedAccessor.intents.authoritative.Store(tt.initAuthoritative)
+			cachedAccessor.Intents.Authoritative.Store(tt.initAuthoritative)
 
 			gotIntents, gotErr := cachedAccessor.ListImagePullIntents()
 			if !reflect.DeepEqual(gotIntents, tt.wantListIntents) {
@@ -428,7 +428,7 @@ func Test_cachedPullRecordsAccessor_ListImagePullIntents(t *testing.T) {
 				t.Errorf("ListImagePullIntents() error = %v, want %v", gotErr, tt.wantListIntentsError)
 			}
 
-			if gotAuthoritative := cachedAccessor.intents.authoritative.Load(); gotAuthoritative != tt.wantAuthoritative {
+			if gotAuthoritative := cachedAccessor.Intents.Authoritative.Load(); gotAuthoritative != tt.wantAuthoritative {
 				t.Errorf("ListImagePullIntents() cache authoritative = %v, want %v", gotAuthoritative, tt.wantAuthoritative)
 			}
 		})
@@ -486,12 +486,12 @@ func Test_cachedPullRecordsAccessor_ListImagePulledRecords(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cachedAccessor := &cachedPullRecordsAccessor{
+			cachedAccessor := &CachedPullRecordsAccessor{
 				delegate:           tt.delegate,
 				pulledRecordsLocks: NewStripedLockSet(10),
-				pulledRecords:      tt.inMemCache,
+				PulledRecords:      tt.inMemCache,
 			}
-			cachedAccessor.pulledRecords.authoritative.Store(tt.initAuthoritative)
+			cachedAccessor.PulledRecords.Authoritative.Store(tt.initAuthoritative)
 
 			gotPulledRecords, gotErr := cachedAccessor.ListImagePulledRecords()
 			if !reflect.DeepEqual(gotPulledRecords, tt.wantListPulledRecords) {
@@ -502,7 +502,7 @@ func Test_cachedPullRecordsAccessor_ListImagePulledRecords(t *testing.T) {
 				t.Errorf("ListImagePulledRecords() error = %v, want %v", gotErr, tt.wantListPulledRecordsError)
 			}
 
-			if gotAuthoritative := cachedAccessor.pulledRecords.authoritative.Load(); gotAuthoritative != tt.wantAuthoritative {
+			if gotAuthoritative := cachedAccessor.PulledRecords.Authoritative.Load(); gotAuthoritative != tt.wantAuthoritative {
 				t.Errorf("ListImagePulledRecords() cache authoritative = %v, want %v", gotAuthoritative, tt.wantAuthoritative)
 			}
 		})
@@ -590,12 +590,12 @@ func Test_cachedPullRecordsAccessor_ImagePullIntentExists(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &cachedPullRecordsAccessor{
+			c := &CachedPullRecordsAccessor{
 				delegate:     tt.delegate,
 				intentsLocks: NewStripedLockSet(10),
-				intents:      tt.initialCache,
+				Intents:      tt.initialCache,
 			}
-			c.intents.authoritative.Store(tt.initAuthoritative)
+			c.Intents.Authoritative.Store(tt.initAuthoritative)
 
 			got, err := c.ImagePullIntentExists(tt.inputImage)
 			if !cmpErrorStrings(err, tt.wantErr) {
@@ -606,11 +606,11 @@ func Test_cachedPullRecordsAccessor_ImagePullIntentExists(t *testing.T) {
 				t.Errorf("cachedPullRecordsAccessor.ImagePullIntentExists() = %v, want %v", got, tt.want)
 			}
 
-			if err := cmpRecordsMapAndCache(tt.wantCacheIntents, c.intents); err != nil {
+			if err := cmpRecordsMapAndCache(tt.wantCacheIntents, c.Intents); err != nil {
 				t.Errorf("cachedPullRecordsAccessor.ImagePullIntentExists() expected cache state differs: %v", err)
 			}
 
-			if gotAuthoritative := c.intents.authoritative.Load(); gotAuthoritative != tt.wantAuthoritative {
+			if gotAuthoritative := c.Intents.Authoritative.Load(); gotAuthoritative != tt.wantAuthoritative {
 				t.Errorf("cachedPullRecordsAccessor.ImagePullIntentExists() cache authoritative = %v, want %v", gotAuthoritative, tt.wantAuthoritative)
 			}
 		})
@@ -716,18 +716,18 @@ func Test_cachedPullRecordsAccessor_WriteImagePullIntent(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &cachedPullRecordsAccessor{
+			c := &CachedPullRecordsAccessor{
 				delegate:     tt.delegate,
 				intentsLocks: NewStripedLockSet(10),
-				intents:      tt.initialCache,
+				Intents:      tt.initialCache,
 			}
-			c.intents.authoritative.Store(tt.initAuthoritative)
+			c.Intents.Authoritative.Store(tt.initAuthoritative)
 
 			if err := c.WriteImagePullIntent(tt.inputImage); !cmpErrorStrings(err, tt.wantErr) {
 				t.Errorf("cachedPullRecordsAccessor.WriteImagePullIntent() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
-			if err := cmpRecordsMapAndCache(tt.wantCacheIntents, c.intents); err != nil {
+			if err := cmpRecordsMapAndCache(tt.wantCacheIntents, c.Intents); err != nil {
 				t.Errorf("cachedPullRecordsAccessor.ImagePullIntentExists() expected cache state differs: %v", err)
 			}
 
@@ -735,7 +735,7 @@ func Test_cachedPullRecordsAccessor_WriteImagePullIntent(t *testing.T) {
 				t.Errorf("cachedPullRecordsAccessor.WriteImagePullIntent() recorded methods = %v, want %v", tt.delegate.methodsCalled, tt.wantRecordedMethods)
 			}
 
-			if gotAuthoritative := c.intents.authoritative.Load(); gotAuthoritative != tt.wantAuthoritative {
+			if gotAuthoritative := c.Intents.Authoritative.Load(); gotAuthoritative != tt.wantAuthoritative {
 				t.Errorf("cachedPullRecordsAccessor.WriteImagePullIntent() cache authoritative = %v, want %v", gotAuthoritative, tt.wantAuthoritative)
 			}
 		})
@@ -883,18 +883,18 @@ func Test_cachedPullRecordsAccessor_WriteImagePulledRecord(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &cachedPullRecordsAccessor{
+			c := &CachedPullRecordsAccessor{
 				delegate:           tt.delegate,
 				pulledRecordsLocks: NewStripedLockSet(10),
-				pulledRecords:      tt.initialCache,
+				PulledRecords:      tt.initialCache,
 			}
-			c.pulledRecords.authoritative.Store(tt.initAuthoritative)
+			c.PulledRecords.Authoritative.Store(tt.initAuthoritative)
 
 			if err := c.WriteImagePulledRecord(tt.inputRecord); !cmpErrorStrings(err, tt.wantErr) {
 				t.Errorf("cachedPullRecordsAccessor.WriteImagePulledRecord() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
-			if err := cmpRecordsMapAndCache(tt.wantCachePulledRecords, c.pulledRecords); err != nil {
+			if err := cmpRecordsMapAndCache(tt.wantCachePulledRecords, c.PulledRecords); err != nil {
 				t.Errorf("cachedPullRecordsAccessor.WriteImagePulledRecord() expected cache state differs: %v", err)
 			}
 
@@ -902,7 +902,7 @@ func Test_cachedPullRecordsAccessor_WriteImagePulledRecord(t *testing.T) {
 				t.Errorf("cachedPullRecordsAccessor.WriteImagePulledRecord() recorded methods = %v, want %v", tt.delegate.methodsCalled, tt.wantRecordedMethods)
 			}
 
-			if gotAuthoritative := c.pulledRecords.authoritative.Load(); gotAuthoritative != tt.wantAuthoritative {
+			if gotAuthoritative := c.PulledRecords.Authoritative.Load(); gotAuthoritative != tt.wantAuthoritative {
 				t.Errorf("cachedPullRecordsAccessor.WriteImagePulledRecord() cache authoritative = %v, want %v", gotAuthoritative, tt.wantAuthoritative)
 			}
 		})
@@ -945,23 +945,23 @@ func Test_cachedPullRecordsAccessor_DeleteImagePullIntent(t *testing.T) {
 		for _, initAuthoritative := range []bool{true, false} {
 			tt.name = tt.name + fmt.Sprintf(", authoritative=%v", initAuthoritative)
 			t.Run(tt.name, func(t *testing.T) {
-				c := &cachedPullRecordsAccessor{
+				c := &CachedPullRecordsAccessor{
 					delegate:     tt.delegate,
 					intentsLocks: NewStripedLockSet(10),
-					intents:      tt.initialCache,
+					Intents:      tt.initialCache,
 				}
-				c.intents.authoritative.Store(initAuthoritative)
+				c.Intents.Authoritative.Store(initAuthoritative)
 
 				if err := c.DeleteImagePullIntent(tt.inputImage); !cmpErrorStrings(err, tt.wantErr) {
 					t.Errorf("cachedPullRecordsAccessor.DeleteImagePullIntent() error = %v, wantErr %v", err, tt.wantErr)
 				}
 
-				c.intents.ignoreEvictionKeys.Range(func(key any, _ any) bool {
+				c.Intents.ignoreEvictionKeys.Range(func(key any, _ any) bool {
 					t.Errorf("key '%v' should no longer be present in the cache.ignoreEvictionKeys map", key)
 					return true
 				})
 
-				if err := cmpRecordsMapAndCache(tt.wantIntents, c.intents); err != nil {
+				if err := cmpRecordsMapAndCache(tt.wantIntents, c.Intents); err != nil {
 					t.Errorf("cachedPullRecordsAccessor.DeleteImagePullIntent() expected cache state differs: %v", err)
 				}
 
@@ -969,7 +969,7 @@ func Test_cachedPullRecordsAccessor_DeleteImagePullIntent(t *testing.T) {
 					t.Errorf("cachedPullRecordsAccessor.DeleteImagePullIntent() delegate intents = %v, want %v", tt.delegate.intents, tt.wantIntents)
 				}
 
-				if gotAuthoritative := c.intents.authoritative.Load(); gotAuthoritative != initAuthoritative {
+				if gotAuthoritative := c.Intents.Authoritative.Load(); gotAuthoritative != initAuthoritative {
 					t.Errorf("cachedPullRecordsAccessor.DeleteImagePullIntent() should not cause authoritative changes = %v, want %v", gotAuthoritative, initAuthoritative)
 				}
 			})
@@ -1013,23 +1013,23 @@ func Test_cachedPullRecordsAccessor_DeleteImagePulledRecord(t *testing.T) {
 		for _, initAuthoritative := range []bool{true, false} {
 			tt.name = tt.name + fmt.Sprintf(", authoritative=%v", initAuthoritative)
 			t.Run(tt.name, func(t *testing.T) {
-				c := &cachedPullRecordsAccessor{
+				c := &CachedPullRecordsAccessor{
 					delegate:           tt.delegate,
 					pulledRecordsLocks: NewStripedLockSet(10),
-					pulledRecords:      tt.initialCache,
+					PulledRecords:      tt.initialCache,
 				}
-				c.pulledRecords.authoritative.Store(initAuthoritative)
+				c.PulledRecords.Authoritative.Store(initAuthoritative)
 
 				if err := c.DeleteImagePulledRecord(tt.imageRef); !cmpErrorStrings(err, tt.wantErr) {
 					t.Errorf("cachedPullRecordsAccessor.DeleteImagePulledRecord() error = %v, wantErr %v", err, tt.wantErr)
 				}
 
-				c.pulledRecords.ignoreEvictionKeys.Range(func(key any, _ any) bool {
+				c.PulledRecords.ignoreEvictionKeys.Range(func(key any, _ any) bool {
 					t.Errorf("key '%v' should no longer be present in the cache.ignoreEvictionKeys map", key)
 					return true
 				})
 
-				if err := cmpRecordsMapAndCache(tt.wantPulledRecords, c.pulledRecords); err != nil {
+				if err := cmpRecordsMapAndCache(tt.wantPulledRecords, c.PulledRecords); err != nil {
 					t.Errorf("cachedPullRecordsAccessor.DeleteImagePulledRecord() expected cache state differs: %v", err)
 				}
 
@@ -1037,7 +1037,7 @@ func Test_cachedPullRecordsAccessor_DeleteImagePulledRecord(t *testing.T) {
 					t.Errorf("cachedPullRecordsAccessor.DeleteImagePulledRecord() delegate imagePulledRecords = %v, want %v", tt.delegate.pulledRecords, tt.wantPulledRecords)
 				}
 
-				if gotAuthoritative := c.pulledRecords.authoritative.Load(); gotAuthoritative != initAuthoritative {
+				if gotAuthoritative := c.PulledRecords.Authoritative.Load(); gotAuthoritative != initAuthoritative {
 					t.Errorf("cachedPullRecordsAccessor.DeleteImagePullIntent() should not cause authoritative changes = %v, want %v", gotAuthoritative, initAuthoritative)
 				}
 			})
@@ -1130,12 +1130,12 @@ func Test_cachedPullRecordsAccessor_GetImagePulledRecord(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &cachedPullRecordsAccessor{
+			c := &CachedPullRecordsAccessor{
 				delegate:           tt.delegate,
 				pulledRecordsLocks: NewStripedLockSet(10),
-				pulledRecords:      tt.cachedPulledRecords,
+				PulledRecords:      tt.cachedPulledRecords,
 			}
-			c.pulledRecords.authoritative.Store(tt.initAuthoritative)
+			c.PulledRecords.Authoritative.Store(tt.initAuthoritative)
 
 			gotPulledRecord, gotExists, err := c.GetImagePulledRecord(tt.imageRef)
 			if !cmpErrorStrings(err, tt.wantErr) {
@@ -1149,11 +1149,11 @@ func Test_cachedPullRecordsAccessor_GetImagePulledRecord(t *testing.T) {
 				t.Errorf("cachedPullRecordsAccessor.GetImagePulledRecord() gotExists = %v, want %v", gotExists, tt.wantExists)
 			}
 
-			if err := cmpRecordsMapAndCache(tt.wantCachePulledRecords, c.pulledRecords); err != nil {
+			if err := cmpRecordsMapAndCache(tt.wantCachePulledRecords, c.PulledRecords); err != nil {
 				t.Errorf("cachedPullRecordsAccessor.GetImagePulledRecord() expected final cache state differs: %v", err)
 			}
 
-			if gotAuthoritative := c.pulledRecords.authoritative.Load(); gotAuthoritative != tt.wantAuthoritative {
+			if gotAuthoritative := c.PulledRecords.Authoritative.Load(); gotAuthoritative != tt.wantAuthoritative {
 				t.Errorf("cachedPullRecordsAccessor.GetImagePulledRecord() cache authoritative = %v, want %v", gotAuthoritative, tt.wantAuthoritative)
 			}
 		})

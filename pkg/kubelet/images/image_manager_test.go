@@ -1095,6 +1095,21 @@ func benchmarkImagePullManagers(b *testing.B, tc *pullManagerBenchmark) {
 					}
 					i++
 				}
+				pullManager, ok := imagePullManager.(*pullmanager.PullManager)
+				if !ok {
+					b.Fatalf("Expected imagePullManager to be of type *pullmanager.PullManager, got %T", imagePullManager)
+				}
+
+				recordsAccessor := pullManager.RecordsAccessor
+				if accessor, ok := recordsAccessor.(*pullmanager.CachedPullRecordsAccessor); ok {
+					if !accessor.PulledRecords.Authoritative.Load() {
+						b.Fatalf("expected the cache to be authoritative, but it is not; records count: %d\n", accessor.PulledRecords.Len())
+					} else {
+						b.Errorf("Cache is authoritative, records count: %d\n", accessor.PulledRecords.Len())
+					}
+				} else {
+					b.Errorf("cache type: %T, expected *pullmanager.CachedPullRecordsAccessor", recordsAccessor)
+				}
 
 				var numPulls int
 				for _, fname := range fakeRuntime.CalledFunctions {

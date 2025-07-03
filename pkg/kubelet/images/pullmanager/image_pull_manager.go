@@ -46,7 +46,7 @@ const writeRecordWhileMatchingLimit = 100
 // to distinguish tenants requesting access to an image that exists on the kubelet's
 // node.
 type PullManager struct {
-	recordsAccessor PullRecordsAccessor
+	RecordsAccessor PullRecordsAccessor
 
 	imagePolicyEnforcer ImagePullPolicyEnforcer
 
@@ -60,7 +60,7 @@ type PullManager struct {
 
 func NewImagePullManager(ctx context.Context, recordsAccessor PullRecordsAccessor, imagePullPolicy ImagePullPolicyEnforcer, imageService kubecontainer.ImageService, lockStripesNum int32) (*PullManager, error) {
 	m := &PullManager{
-		recordsAccessor: recordsAccessor,
+		RecordsAccessor: recordsAccessor,
 
 		imagePolicyEnforcer: imagePullPolicy,
 
@@ -81,7 +81,7 @@ func (f *PullManager) RecordPullIntent(image string) error {
 	f.intentAccessors.Lock(image)
 	defer f.intentAccessors.Unlock(image)
 
-	if err := f.recordsAccessor.WriteImagePullIntent(image); err != nil {
+	if err := f.RecordsAccessor.WriteImagePullIntent(image); err != nil {
 		return fmt.Errorf("failed to record image pull intent: %w", err)
 	}
 
@@ -122,7 +122,7 @@ func (f *PullManager) writePulledRecordIfChanged(image, imageRef string, credent
 		return fmt.Errorf("invalid image name %q: %w", image, err)
 	}
 
-	pulledRecord, _, err := f.recordsAccessor.GetImagePulledRecord(imageRef)
+	pulledRecord, _, err := f.RecordsAccessor.GetImagePulledRecord(imageRef)
 	if err != nil {
 		klog.InfoS("failed to retrieve an ImagePulledRecord", "image", image, "err", err)
 		pulledRecord = nil
@@ -151,7 +151,7 @@ func (f *PullManager) writePulledRecordIfChanged(image, imageRef string, credent
 		return nil
 	}
 
-	return f.recordsAccessor.WriteImagePulledRecord(pulledRecord)
+	return f.RecordsAccessor.WriteImagePulledRecord(pulledRecord)
 }
 
 func (f *PullManager) RecordImagePullFailed(image string) {
@@ -166,7 +166,7 @@ func (f *PullManager) decrementImagePullIntent(image string) {
 	defer f.intentAccessors.Unlock(image)
 
 	if f.getIntentCounterForImage(image) <= 1 {
-		if err := f.recordsAccessor.DeleteImagePullIntent(image); err != nil {
+		if err := f.RecordsAccessor.DeleteImagePullIntent(image); err != nil {
 			klog.ErrorS(err, "failed to remove image pull intent", "image", image)
 			return
 		}
@@ -196,7 +196,7 @@ func (f *PullManager) MustAttemptImagePull(image, imageRef string, podSecrets []
 
 		var err error
 		var exists bool
-		pulledRecord, exists, err = f.recordsAccessor.GetImagePulledRecord(imageRef)
+		pulledRecord, exists, err = f.RecordsAccessor.GetImagePulledRecord(imageRef)
 		switch {
 		case err != nil:
 			return err
@@ -213,7 +213,7 @@ func (f *PullManager) MustAttemptImagePull(image, imageRef string, podSecrets []
 				break
 			}
 
-			if exists, err := f.recordsAccessor.ImagePullIntentExists(image); err != nil {
+			if exists, err := f.RecordsAccessor.ImagePullIntentExists(image); err != nil {
 				return fmt.Errorf("failed to check existence of an image pull intent: %w", err)
 			} else if exists {
 				imagePulledByKubelet = true
@@ -299,7 +299,7 @@ func (f *PullManager) PruneUnknownRecords(imageList []string, until time.Time) {
 	f.pulledAccessors.GlobalLock()
 	defer f.pulledAccessors.GlobalUnlock()
 
-	pulledRecords, err := f.recordsAccessor.ListImagePulledRecords()
+	pulledRecords, err := f.RecordsAccessor.ListImagePulledRecords()
 	if err != nil {
 		klog.ErrorS(err, "there were errors listing ImagePulledRecords, garbage collection will proceed with incomplete records list")
 	}
@@ -315,7 +315,7 @@ func (f *PullManager) PruneUnknownRecords(imageList []string, until time.Time) {
 			continue
 		}
 
-		if err := f.recordsAccessor.DeleteImagePulledRecord(imageRecord.ImageRef); err != nil {
+		if err := f.RecordsAccessor.DeleteImagePulledRecord(imageRecord.ImageRef); err != nil {
 			klog.ErrorS(err, "failed to remove an ImagePulledRecord", "imageRef", imageRecord.ImageRef)
 		}
 	}
@@ -330,7 +330,7 @@ func (f *PullManager) PruneUnknownRecords(imageList []string, until time.Time) {
 // This method is not thread-safe and it should only be called upon the creation
 // of the PullManager.
 func (f *PullManager) initialize(ctx context.Context) {
-	pullIntents, err := f.recordsAccessor.ListImagePullIntents()
+	pullIntents, err := f.RecordsAccessor.ListImagePullIntents()
 	if err != nil {
 		klog.ErrorS(err, "there were errors listing ImagePullIntents, continuing with an incomplete records list")
 	}
@@ -362,7 +362,7 @@ func (f *PullManager) initialize(ctx context.Context) {
 				continue
 			}
 
-			if err := f.recordsAccessor.DeleteImagePullIntent(image); err != nil {
+			if err := f.RecordsAccessor.DeleteImagePullIntent(image); err != nil {
 				klog.V(2).InfoS("failed to remove image pull intent file", "imageName", image, "error", err)
 			}
 		}

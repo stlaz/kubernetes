@@ -444,7 +444,7 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 			}
 
 			f := &PullManager{
-				recordsAccessor:     fsRecordAccessor,
+				RecordsAccessor:     fsRecordAccessor,
 				imagePolicyEnforcer: tt.imagePullPolicy,
 				intentAccessors:     NewStripedLockSet(10),
 				intentCounters:      &sync.Map{},
@@ -521,7 +521,7 @@ func TestFileBasedImagePullManager_RecordPullIntent(t *testing.T) {
 			}
 
 			f := &PullManager{
-				recordsAccessor: fsRecordAccessor,
+				RecordsAccessor: fsRecordAccessor,
 				intentAccessors: NewStripedLockSet(10),
 				intentCounters:  &sync.Map{},
 			}
@@ -717,7 +717,7 @@ func TestFileBasedImagePullManager_RecordImagePulled(t *testing.T) {
 			}
 
 			f := &PullManager{
-				recordsAccessor: fsRecordAccessor,
+				RecordsAccessor: fsRecordAccessor,
 				intentAccessors: NewStripedLockSet(10),
 				intentCounters:  &sync.Map{},
 				pulledAccessors: NewStripedLockSet(10),
@@ -892,7 +892,7 @@ func TestFileBasedImagePullManager_initialize(t *testing.T) {
 			}
 
 			f := &PullManager{
-				recordsAccessor: fsRecordAccessor,
+				RecordsAccessor: fsRecordAccessor,
 				imageService:    imageService,
 				intentAccessors: NewStripedLockSet(10),
 				intentCounters:  &sync.Map{},
@@ -1006,7 +1006,7 @@ func TestFileBasedImagePullManager_PruneUnknownRecords(t *testing.T) {
 			}
 
 			f := &PullManager{
-				recordsAccessor: fsRecordAccessor,
+				RecordsAccessor: fsRecordAccessor,
 				pulledAccessors: NewStripedLockSet(10),
 			}
 			f.PruneUnknownRecords(tt.imageList, tt.gcStartTime)
