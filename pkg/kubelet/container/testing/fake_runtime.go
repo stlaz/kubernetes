@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"reflect"
 	"slices"
+	"sort"
 	"sync"
 	"time"
 
@@ -33,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -418,6 +420,8 @@ func snapshot(imageList map[string]kubecontainer.Image) []kubecontainer.Image {
 	for _, v := range imageList {
 		result = append(result, v)
 	}
+	// nodestatus.Images expected the images to be sorted by image size
+	sort.Sort(sliceutils.ByImageSize(result))
 	return result
 }
 
