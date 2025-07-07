@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -966,9 +968,24 @@ type pullManagerBenchmark struct {
 type pullManagerBenchmarkDimensions struct {
 	cacheHitPercent        []int32
 	imagesPresentAndCached []int32
+	// concurrentAccessProcMultiplier is a multiplier to the number of processors
+	// available to test concurrent access to stripe-locked areas of the code.
+	//
+	// Possible values:
+	//   n = 0 - means no concurrency
+	//   n > 1 - testing `n*P` concurrent access to code locked by the `P`-long
+	//           striped set of locks, where `P` is also the number of CPUs available.
+	//
+	// `n` should never be `1` if any `n > 1` values also appear in the set as that
+	// would be comparing true parallelism with concurrency, which might taint the
+	// benchmark results.
+	concurrentAccessProcMultiplier []int32
 }
 
-func (pb *pullManagerBenchmark) populate(fakeRuntime *ctest.FakeRuntime, imagePullManager pullmanager.ImagePullManager, recordsNum, requestsNum, cacheHitPercent int32) []string {
+// benchmarkPregeneratedRequestsTotal is the number of pregenerated requests for the benchmark
+const benchmarkPregeneratedRequestsTotal int32 = 40000
+
+func (pb *pullManagerBenchmark) populate(fakeRuntime *ctest.FakeRuntime, imagePullManager pullmanager.ImagePullManager, recordsNum, cacheHitPercent int32) []string {
 	var imgIDs []string
 	for range recordsNum {
 		imgID := uuid.New().String()
@@ -979,8 +996,8 @@ func (pb *pullManagerBenchmark) populate(fakeRuntime *ctest.FakeRuntime, imagePu
 	}
 
 	imgNameToRefMapping := make(map[string]string, recordsNum)
-	imageRequests := make([]string, requestsNum)
-	for i := range requestsNum {
+	imageRequests := make([]string, benchmarkPregeneratedRequestsTotal)
+	for i := range benchmarkPregeneratedRequestsTotal {
 		// use imgRef even for cache misses. This way a cache miss won't cause a new
 		// record, meaning if we had an LRU cache that's authoritative based on number
 		// of records, we're able to reliably test the authoritative->non-authoritative
@@ -1009,8 +1026,9 @@ func (pb *pullManagerBenchmark) populate(fakeRuntime *ctest.FakeRuntime, imagePu
 
 func BenchmarkImagePullManager_CompareEnsureSecretPulledImages(b *testing.B) {
 	testDimensions := pullManagerBenchmarkDimensions{
-		imagesPresentAndCached: []int32{100},
-		cacheHitPercent:        []int32{100},
+		imagesPresentAndCached:         []int32{100},
+		cacheHitPercent:                []int32{100},
+		concurrentAccessProcMultiplier: []int32{0},
 	}
 
 	b.Run("ImageRecordsAccess=Disabled", func(b *testing.B) {
@@ -1043,8 +1061,26 @@ func BenchmarkImagePullManageWithEnsureSecretPulledImages(b *testing.B) {
 				enableFeatures:         []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
 
 				dimensions: pullManagerBenchmarkDimensions{
-					imagesPresentAndCached: []int32{10, 50, 100, 500},
-					cacheHitPercent:        []int32{10, 20, 50, 75, 100},
+					imagesPresentAndCached:         []int32{10, 50, 100, 200, 500},
+					cacheHitPercent:                []int32{10, 20, 50, 75, 100},
+					concurrentAccessProcMultiplier: []int32{0},
+				},
+			},
+		)
+	})
+}
+
+func BenchmarkImagePullManageWithEnsureSecretPulledImages_LockContention(b *testing.B) {
+	b.Run("ImageRecordsAccess=DirectFS", func(b *testing.B) {
+		benchmarkImagePullManagers(b,
+			&pullManagerBenchmark{
+				createImagePullManager: prepareFSImagePullManager,
+				enableFeatures:         []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
+
+				dimensions: pullManagerBenchmarkDimensions{
+					imagesPresentAndCached:         []int32{100, 200},
+					cacheHitPercent:                []int32{10, 20, 50, 75, 100},
+					concurrentAccessProcMultiplier: []int32{0, 5, 20},
 				},
 			},
 		)
@@ -1060,6 +1096,59 @@ func benchmarkImagePullManagers(b *testing.B, tc *pullManagerBenchmark) {
 		burst = 0
 	)
 
+	for _, recordsNum := range tc.dimensions.imagesPresentAndCached {
+		for _, cacheHitRate := range tc.dimensions.cacheHitPercent {
+			for _, concurrencyMultiplier := range tc.dimensions.concurrentAccessProcMultiplier {
+				b.Run(fmt.Sprintf("Records=%d/CacheHitRate=%d/Concurrent=%d", recordsNum, cacheHitRate, concurrencyMultiplier), func(b *testing.B) {
+					testCtx := ktesting.InitCtx(context.Background(), b)
+
+					fakeRuntime := &ctest.FakeRuntime{T: b, ImageList: map[string]kubecontainer.Image{}}
+					imagePullManager := tc.createImagePullManager(testCtx, b, fakeRuntime)
+
+					fakeRecorder := testutil.NewFakeRecorder()
+					fakePodPullingTimeRecorder := &mockPodPullingTimeRecorder{}
+					maxParallel := concurrencyMultiplier * int32(runtime.NumCPU())
+					puller := NewImageManager(fakeRecorder, &credentialprovider.BasicDockerKeyring{}, fakeRuntime, imagePullManager, flowcontrol.NewBackOff(time.Second, 300*time.Second), false, ptr.To(maxParallel), qps, burst, fakePodPullingTimeRecorder)
+
+					imageRequests := tc.populate(fakeRuntime, imagePullManager, recordsNum, cacheHitRate)
+
+					var ensureCalledTotal int32
+					if concurrencyMultiplier > 0 {
+						ensureCalledTotal = runConcurrentBenchmark(b, testCtx, concurrencyMultiplier, puller, imageRequests)
+					} else {
+						ensureCalledTotal = runSerializedBenchmark(b, testCtx, puller, imageRequests)
+					}
+
+					var numPulls int32
+					for _, fname := range fakeRuntime.CalledFunctions {
+						if fname == "PullImage" {
+							numPulls++
+						}
+					}
+
+					// if b.N is currently too low (<100), the generated requests set won't reliably
+					// adhere to the prescribed hit rate.
+					// That's ok once the benchmark is re-run with a higher b.N,
+					// this check is here mostly for ensuring the benchmark mechanisms
+					// are not broken.
+					if ensureCalledTotal <= 10 {
+						return
+					}
+
+					allowedHitRateSkew := 5.0
+					if ensureCalledTotal <= 100 {
+						allowedHitRateSkew = 20
+					}
+					require.InDelta(b, 100-cacheHitRate, numPulls*100/ensureCalledTotal, allowedHitRateSkew, "numPulls %d, ensureCalledTotal %d", numPulls, ensureCalledTotal)
+				})
+			}
+		}
+	}
+}
+
+func runSerializedBenchmark(b *testing.B, testCtx context.Context, puller ImageManager, imageRequests []string) int32 {
+	var i int32 = 0
+
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test_pod",
@@ -1068,41 +1157,67 @@ func benchmarkImagePullManagers(b *testing.B, tc *pullManagerBenchmark) {
 			ResourceVersion: "42",
 		}}
 
-	for _, recordsNum := range tc.dimensions.imagesPresentAndCached {
-		for _, cacheHitRate := range tc.dimensions.cacheHitPercent {
-			b.Run(fmt.Sprintf("Records=%d/CacheHitRate=%d", recordsNum, cacheHitRate), func(b *testing.B) {
-				testCtx := ktesting.InitCtx(context.Background(), b)
+	for b.Loop() {
+		if _, msg, err := puller.EnsureImageExists(testCtx, &v1.ObjectReference{}, pod, imageRequests[i%benchmarkPregeneratedRequestsTotal], []v1.Secret{}, nil, "", v1.PullIfNotPresent); err != nil {
+			b.Fatalf("EnsureImageExists failed: %v: %s", err, msg)
+		}
+		i++
+	}
+	return i
+}
 
-				fakeRuntime := &ctest.FakeRuntime{T: b, ImageList: map[string]kubecontainer.Image{}}
-				imagePullManager := tc.createImagePullManager(testCtx, b, fakeRuntime)
+func runConcurrentBenchmark(b *testing.B, testCtx context.Context, concurrencyMultiplier int32, puller ImageManager, imageRequests []string) int32 {
+	b.SetParallelism(int(concurrencyMultiplier))
 
-				fakeRecorder := testutil.NewFakeRecorder()
-				fakePodPullingTimeRecorder := &mockPodPullingTimeRecorder{}
-				puller := NewImageManager(fakeRecorder, &credentialprovider.BasicDockerKeyring{}, fakeRuntime, imagePullManager, flowcontrol.NewBackOff(time.Second, 300*time.Second), false, ptr.To[int32](0), qps, burst, fakePodPullingTimeRecorder)
+	// we need to chunk the original slice of requests, otherwise planned
+	// non-hits would result as hits if multiple goroutines's requests would overlap
+	goroutinesNum := int(concurrencyMultiplier) * runtime.NumCPU()
+	imageRequestsChunked := make([][]string, goroutinesNum)
 
-				const preGenRequestNum int32 = 10000
-				imageRequests := tc.populate(fakeRuntime, imagePullManager, recordsNum, preGenRequestNum, cacheHitRate)
-
-				i := atomic.Int32{}
-				b.ReportAllocs()
-				for b.Loop() {
-					if _, msg, err := puller.EnsureImageExists(testCtx, &v1.ObjectReference{}, pod, imageRequests[i.Load()%preGenRequestNum], []v1.Secret{}, nil, "", v1.PullIfNotPresent); err != nil {
-						b.Fatalf("EnsureImageExists failed: %v: %s", err, msg)
-					}
-					i.Add(1)
-				}
-
-				var numPulls int32
-				for _, fname := range fakeRuntime.CalledFunctions {
-					if fname == "PullImage" {
-						numPulls++
-					}
-				}
-				require.InDelta(b, 100-cacheHitRate, numPulls*100/i.Load(), 5)
-			})
+	var i int
+	for chunk := range slices.Chunk(imageRequests, int(benchmarkPregeneratedRequestsTotal)/goroutinesNum) {
+		imageRequestsChunked[i] = chunk
+		i++
+		if i == len(imageRequestsChunked) {
+			break
 		}
 	}
 
+	ensureCalled := atomic.Int32{}
+	myChunkIdx := atomic.Int32{}
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		myChunkIdx := myChunkIdx.Add(1) - 1
+		myChunkLen := int32(len(imageRequestsChunked[myChunkIdx]))
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "test_pod",
+				Namespace:       "test-ns",
+				UID:             "bar",
+				ResourceVersion: "42",
+			}}
+
+		var reqNum int32
+		for pb.Next() {
+			if _, msg, err := puller.EnsureImageExists(testCtx,
+				&v1.ObjectReference{},
+				pod,
+				imageRequestsChunked[myChunkIdx][reqNum%myChunkLen],
+				[]v1.Secret{},
+				nil,
+				"",
+				v1.PullIfNotPresent,
+			); err != nil {
+				b.Fatalf("EnsureImageExists failed: %v: %s", err, msg)
+			}
+			reqNum++
+		}
+		ensureCalled.Add(reqNum)
+	})
+	b.StopTimer()
+
+	return ensureCalled.Load()
 }
 
 func prepareFSImagePullManager(ctx context.Context, b *testing.B, imageService kubecontainer.ImageService) pullmanager.ImagePullManager {
@@ -1113,7 +1228,7 @@ func prepareFSImagePullManager(ctx context.Context, b *testing.B, imageService k
 		b.Fatalf("failed to set up FS-cache accessor: %v", err)
 	}
 
-	pullManager, err := pullmanager.NewImagePullManager(ctx, fsAccessor, pullmanager.AlwaysVerifyImagePullPolicy(), imageService, 10)
+	pullManager, err := pullmanager.NewImagePullManager(ctx, fsAccessor, pullmanager.AlwaysVerifyImagePullPolicy(), imageService, int32(runtime.NumCPU()))
 	if err != nil {
 		b.Fatalf("failed to set up image pull manager: %v", err)
 	}
