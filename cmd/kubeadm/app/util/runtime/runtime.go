@@ -190,7 +190,7 @@ func (runtime *CRIRuntime) RemoveContainers(containers []string) error {
 // PullImage pulls the image
 func (runtime *CRIRuntime) PullImage(image string) (err error) {
 	for i := 0; i < constants.PullImageRetry; i++ {
-		if _, err = runtime.impl.PullImage(context.Background(), runtime.imageService, &runtimeapi.ImageSpec{Image: image}, nil, nil); err == nil {
+		if _, _, err = runtime.impl.PullImage(context.Background(), runtime.imageService, &runtimeapi.ImageSpec{Image: image}, nil, nil); err == nil {
 			return nil
 		}
 	}
