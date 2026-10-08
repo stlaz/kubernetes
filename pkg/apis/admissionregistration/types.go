@@ -1117,6 +1117,14 @@ type WebhookClientConfig struct {
 	// If unspecified, system trust roots on the apiserver are used.
 	// +optional
 	CABundle []byte
+
+	// clusterTrustBundle allows to select ClusterTrustBundle objects to source trust from to validate
+	// API server's serving certificate.
+	// If both CABundle and ClusterTrustBundle are unspecified, system trust roots on the apiserver are used.
+	//
+	// +featureGate=ClusterTrustBundleSelector
+	// +optional
+	ClusterTrustBundle *ClusterTrustBundleSelector
 }
 
 // ServiceReference holds a reference to Service.legacy.k8s.io
@@ -1495,4 +1503,33 @@ type MutatingAdmissionPolicyBindingSpec struct {
 	// '*' matches CREATE, UPDATE and CONNECT.
 	// +optional
 	MatchResources *MatchResources
+}
+
+// clusterTrustBundleSelector allows to configure trust by poiting to
+// a selection of ClusterTrustBundles
+type ClusterTrustBundleSelector struct {
+	// name selects a single ClusterTrustBundle by name.
+	//
+	// Mutually-exclusive with `signerName` and `labelSelector`.
+	// +optional
+	Name *string
+
+	// signerName selects all ClusterTrustBundles for a signer with
+	// matching name.
+	// The selection can be narrowed down by using `labelSelector`.
+	// The contents of all selected ClusterTrustBundles will be
+	// unified and deduplicated.
+	//
+	// Mutually-exclusive with `name`.
+	// +optional
+	SignerName *string
+
+	// labelSelector allows to narrow down the selection of
+	// ClusterTrustBundles for a signer with a given `signerName`.
+	// If unset, interpreted as "match nothing". If set but empty,
+	// interpreted as "match everything".
+	//
+	// Mutually-exclusive with `name`.
+	// +optional
+	LabelSelector *metav1.LabelSelector
 }

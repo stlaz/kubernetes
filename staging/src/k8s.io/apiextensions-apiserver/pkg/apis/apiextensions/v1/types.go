@@ -144,6 +144,14 @@ type WebhookClientConfig struct {
 	// If unspecified, system trust roots on the apiserver are used.
 	// +optional
 	CABundle []byte `json:"caBundle,omitempty" protobuf:"bytes,2,opt,name=caBundle"`
+
+	// clusterTrustBundle allows to select ClusterTrustBundle objects to source trust from to validate
+	// API server's serving certificate.
+	// If both CABundle and ClusterTrustBundle are unspecified, system trust roots on the apiserver are used.
+	//
+	// +featureGate=ClusterTrustBundleSelector
+	// +optional
+	ClusterTrustBundle *ClusterTrustBundleSelector `protobuf:"bytes,4,opt,name=clusterTrustBundle"`
 }
 
 // ServiceReference holds a reference to Service.legacy.k8s.io
@@ -528,4 +536,33 @@ type ConversionResponse struct {
 	// `result.status` to `Failure` and provide more details in `result.message` and return http status 200. The `result.message`
 	// will be used to construct an error message for the end user.
 	Result metav1.Status `json:"result" protobuf:"bytes,3,name=result"`
+}
+
+// clusterTrustBundleSelector allows to configure trust by poiting to
+// a selection of ClusterTrustBundles
+type ClusterTrustBundleSelector struct {
+	// name selects a single ClusterTrustBundle by name.
+	//
+	// Mutually-exclusive with `signerName` and `labelSelector`.
+	// +optional
+	Name *string `protobuf:"bytes,1,opt,name=name"`
+
+	// signerName selects all ClusterTrustBundles for a signer with
+	// matching name.
+	// The selection can be narrowed down by using `labelSelector`.
+	// The contents of all selected ClusterTrustBundles will be
+	// unified and deduplicated.
+	//
+	// Mutually-exclusive with `name`.
+	// +optional
+	SignerName *string `protobuf:"bytes,2,opt,name=signerName"`
+
+	// labelSelector allows to narrow down the selection of
+	// ClusterTrustBundles for a signer with a given `signerName`.
+	// If unset, interpreted as "match nothing". If set but empty,
+	// interpreted as "match everything".
+	//
+	// Mutually-exclusive with `name`.
+	// +optional
+	LabelSelector *metav1.LabelSelector `protobuf:"bytes,3,opt,name=labelSelector"`
 }

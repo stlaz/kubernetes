@@ -16,7 +16,9 @@ limitations under the License.
 
 package apiregistration
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -59,10 +61,16 @@ type APIServiceSpec struct {
 	// This is strongly discouraged.  You should use the CABundle instead.
 	InsecureSkipTLSVerify bool
 	// CABundle is a PEM encoded CA bundle which will be used to validate an API server's serving certificate.
-	// If unspecified, system trust roots on the apiserver are used.
+	// If both CABundle and ClusterTrustBundle are unspecified, system trust roots on the apiserver are used.
 	// +listType=atomic
 	// +optional
 	CABundle []byte
+
+	// clusterTrustBundle allows to select ClusterTrustBundle objects to source trust from to validate
+	// API server's serving certificate.
+	// If both CABundle and ClusterTrustBundle are unspecified, system trust roots on the apiserver are used.
+	// +optional
+	ClusterTrustBundle *ClusterTrustBundleSelector
 
 	// GroupPriorityMinimum is the priority this group should have at least. Higher priority means that the group is preferred by clients over lower priority ones.
 	// Note that other versions of this group might specify even higher GroupPriorityMinimum values such that the whole group gets a higher priority.
@@ -143,4 +151,33 @@ type APIService struct {
 	Spec APIServiceSpec
 	// Status contains derived information about an API server
 	Status APIServiceStatus
+}
+
+// clusterTrustBundleSelector allows to configure trust by poiting to
+// a selection of ClusterTrustBundles
+type ClusterTrustBundleSelector struct {
+	// name selects a single ClusterTrustBundle by name.
+	//
+	// Mutually-exclusive with `signerName` and `labelSelector`.
+	// +optional
+	Name *string
+
+	// signerName selects all ClusterTrustBundles for a signer with
+	// matching name.
+	// The selection can be narrowed down by using `labelSelector`.
+	// The contents of all selected ClusterTrustBundles will be
+	// unified and deduplicated.
+	//
+	// Mutually-exclusive with `name`.
+	// +optional
+	SignerName *string
+
+	// labelSelector allows to narrow down the selection of
+	// ClusterTrustBundles for a signer with a given `signerName`.
+	// If unset, interpreted as "match nothing". If set but empty,
+	// interpreted as "match everything".
+	//
+	// Mutually-exclusive with `name`.
+	// +optional
+	LabelSelector *metav1.LabelSelector
 }

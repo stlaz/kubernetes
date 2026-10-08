@@ -1,3 +1,6 @@
+API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,ClusterTrustBundleSelector,LabelSelector
+API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,ClusterTrustBundleSelector,Name
+API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,ClusterTrustBundleSelector,SignerName
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,Ref
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,Schema
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XEmbeddedResource
@@ -13,6 +16,7 @@ API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiexten
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaPropsOrBool,Schema
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaPropsOrStringArray,Property
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaPropsOrStringArray,Schema
+API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,WebhookClientConfig,ClusterTrustBundle
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,CustomResourceColumnDefinition,JSONPath
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,Ref
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,Schema
