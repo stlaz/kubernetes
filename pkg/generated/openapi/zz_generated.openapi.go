@@ -128,6 +128,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 	return map[string]common.OpenAPIDefinition{
 		v1.ApplyConfiguration{}.OpenAPIModelName():                                                                      schema_k8sio_api_admissionregistration_v1_ApplyConfiguration(ref),
 		v1.AuditAnnotation{}.OpenAPIModelName():                                                                         schema_k8sio_api_admissionregistration_v1_AuditAnnotation(ref),
+		v1.ClusterTrustBundleSelector{}.OpenAPIModelName():                                                              schema_k8sio_api_admissionregistration_v1_ClusterTrustBundleSelector(ref),
 		v1.ExpressionWarning{}.OpenAPIModelName():                                                                       schema_k8sio_api_admissionregistration_v1_ExpressionWarning(ref),
 		v1.JSONPatch{}.OpenAPIModelName():                                                                               schema_k8sio_api_admissionregistration_v1_JSONPatch(ref),
 		v1.MatchCondition{}.OpenAPIModelName():                                                                          schema_k8sio_api_admissionregistration_v1_MatchCondition(ref),
@@ -1327,6 +1328,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		storagemigrationv1beta1.StorageVersionMigrationList{}.OpenAPIModelName():                                        schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationList(ref),
 		storagemigrationv1beta1.StorageVersionMigrationSpec{}.OpenAPIModelName():                                        schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationSpec(ref),
 		storagemigrationv1beta1.StorageVersionMigrationStatus{}.OpenAPIModelName():                                      schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationStatus(ref),
+		apiextensionsv1.ClusterTrustBundleSelector{}.OpenAPIModelName():                                                 schema_pkg_apis_apiextensions_v1_ClusterTrustBundleSelector(ref),
 		apiextensionsv1.ConversionRequest{}.OpenAPIModelName():                                                          schema_pkg_apis_apiextensions_v1_ConversionRequest(ref),
 		apiextensionsv1.ConversionResponse{}.OpenAPIModelName():                                                         schema_pkg_apis_apiextensions_v1_ConversionResponse(ref),
 		apiextensionsv1.ConversionReview{}.OpenAPIModelName():                                                           schema_pkg_apis_apiextensions_v1_ConversionReview(ref),
@@ -1484,6 +1486,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		apiregistrationv1.APIServiceList{}.OpenAPIModelName():                                                           schema_pkg_apis_apiregistration_v1_APIServiceList(ref),
 		apiregistrationv1.APIServiceSpec{}.OpenAPIModelName():                                                           schema_pkg_apis_apiregistration_v1_APIServiceSpec(ref),
 		apiregistrationv1.APIServiceStatus{}.OpenAPIModelName():                                                         schema_pkg_apis_apiregistration_v1_APIServiceStatus(ref),
+		apiregistrationv1.ClusterTrustBundleSelector{}.OpenAPIModelName():                                               schema_pkg_apis_apiregistration_v1_ClusterTrustBundleSelector(ref),
 		apiregistrationv1.ServiceReference{}.OpenAPIModelName():                                                         schema_pkg_apis_apiregistration_v1_ServiceReference(ref),
 		apiregistrationv1beta1.APIService{}.OpenAPIModelName():                                                          schema_pkg_apis_apiregistration_v1beta1_APIService(ref),
 		apiregistrationv1beta1.APIServiceCondition{}.OpenAPIModelName():                                                 schema_pkg_apis_apiregistration_v1beta1_APIServiceCondition(ref),
@@ -1666,6 +1669,41 @@ func schema_k8sio_api_admissionregistration_v1_AuditAnnotation(ref common.Refere
 				Required: []string{"key", "valueExpression"},
 			},
 		},
+	}
+}
+
+func schema_k8sio_api_admissionregistration_v1_ClusterTrustBundleSelector(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "clusterTrustBundleSelector allows to configure trust by poiting to a selection of ClusterTrustBundles",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"Name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name selects a single ClusterTrustBundle by name.\n\nMutually-exclusive with `signerName` and `labelSelector`.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"SignerName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "signerName selects all ClusterTrustBundles for a signer with matching name. The selection can be narrowed down by using `labelSelector`. The contents of all selected ClusterTrustBundles will be unified and deduplicated.\n\nMutually-exclusive with `name`.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"LabelSelector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "labelSelector allows to narrow down the selection of ClusterTrustBundles for a signer with a given `signerName`. If unset, interpreted as \"match nothing\". If set but empty, interpreted as \"match everything\".\n\nMutually-exclusive with `name`.",
+							Ref:         ref(metav1.LabelSelector{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			metav1.LabelSelector{}.OpenAPIModelName()},
 	}
 }
 
@@ -3653,11 +3691,17 @@ func schema_k8sio_api_admissionregistration_v1_WebhookClientConfig(ref common.Re
 							Format:      "byte",
 						},
 					},
+					"ClusterTrustBundle": {
+						SchemaProps: spec.SchemaProps{
+							Description: "clusterTrustBundle allows to select ClusterTrustBundle objects to source trust from to validate API server's serving certificate. If both CABundle and ClusterTrustBundle are unspecified, system trust roots on the apiserver are used.",
+							Ref:         ref(v1.ClusterTrustBundleSelector{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			v1.ServiceReference{}.OpenAPIModelName()},
+			v1.ClusterTrustBundleSelector{}.OpenAPIModelName(), v1.ServiceReference{}.OpenAPIModelName()},
 	}
 }
 
@@ -62468,6 +62512,41 @@ func schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationStatus(ref
 	}
 }
 
+func schema_pkg_apis_apiextensions_v1_ClusterTrustBundleSelector(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "clusterTrustBundleSelector allows to configure trust by poiting to a selection of ClusterTrustBundles",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"Name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name selects a single ClusterTrustBundle by name.\n\nMutually-exclusive with `signerName` and `labelSelector`.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"SignerName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "signerName selects all ClusterTrustBundles for a signer with matching name. The selection can be narrowed down by using `labelSelector`. The contents of all selected ClusterTrustBundles will be unified and deduplicated.\n\nMutually-exclusive with `name`.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"LabelSelector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "labelSelector allows to narrow down the selection of ClusterTrustBundles for a signer with a given `signerName`. If unset, interpreted as \"match nothing\". If set but empty, interpreted as \"match everything\".\n\nMutually-exclusive with `name`.",
+							Ref:         ref(metav1.LabelSelector{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			metav1.LabelSelector{}.OpenAPIModelName()},
+	}
+}
+
 func schema_pkg_apis_apiextensions_v1_ConversionRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -63893,11 +63972,17 @@ func schema_pkg_apis_apiextensions_v1_WebhookClientConfig(ref common.ReferenceCa
 							Format:      "byte",
 						},
 					},
+					"ClusterTrustBundle": {
+						SchemaProps: spec.SchemaProps{
+							Description: "clusterTrustBundle allows to select ClusterTrustBundle objects to source trust from to validate API server's serving certificate. If both CABundle and ClusterTrustBundle are unspecified, system trust roots on the apiserver are used.",
+							Ref:         ref(apiextensionsv1.ClusterTrustBundleSelector{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			apiextensionsv1.ServiceReference{}.OpenAPIModelName()},
+			apiextensionsv1.ClusterTrustBundleSelector{}.OpenAPIModelName(), apiextensionsv1.ServiceReference{}.OpenAPIModelName()},
 	}
 }
 
@@ -70869,9 +70954,15 @@ func schema_pkg_apis_apiregistration_v1_APIServiceSpec(ref common.ReferenceCallb
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "CABundle is a PEM encoded CA bundle which will be used to validate an API server's serving certificate. If unspecified, system trust roots on the apiserver are used.",
+							Description: "CABundle is a PEM encoded CA bundle which will be used to validate an API server's serving certificate. If both CABundle and ClusterTrustBundle are unspecified, system trust roots on the apiserver are used.",
 							Type:        []string{"string"},
 							Format:      "byte",
+						},
+					},
+					"clusterTrustBundle": {
+						SchemaProps: spec.SchemaProps{
+							Description: "clusterTrustBundle allows to select ClusterTrustBundle objects to source trust from to validate API server's serving certificate. If both CABundle and ClusterTrustBundle are unspecified, system trust roots on the apiserver are used.",
+							Ref:         ref(apiregistrationv1.ClusterTrustBundleSelector{}.OpenAPIModelName()),
 						},
 					},
 					"groupPriorityMinimum": {
@@ -70895,7 +70986,7 @@ func schema_pkg_apis_apiregistration_v1_APIServiceSpec(ref common.ReferenceCallb
 			},
 		},
 		Dependencies: []string{
-			apiregistrationv1.ServiceReference{}.OpenAPIModelName()},
+			apiregistrationv1.ClusterTrustBundleSelector{}.OpenAPIModelName(), apiregistrationv1.ServiceReference{}.OpenAPIModelName()},
 	}
 }
 
@@ -70934,6 +71025,41 @@ func schema_pkg_apis_apiregistration_v1_APIServiceStatus(ref common.ReferenceCal
 		},
 		Dependencies: []string{
 			apiregistrationv1.APIServiceCondition{}.OpenAPIModelName()},
+	}
+}
+
+func schema_pkg_apis_apiregistration_v1_ClusterTrustBundleSelector(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "clusterTrustBundleSelector allows to configure trust by poiting to a selection of ClusterTrustBundles",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name selects a single ClusterTrustBundle by name.\n\nMutually-exclusive with `signerName` and `labelSelector`.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"signerName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "signerName selects all ClusterTrustBundles for a signer with matching name. The selection can be narrowed down by using `labelSelector`. The contents of all selected ClusterTrustBundles will be unified and deduplicated.\n\nMutually-exclusive with `name`.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"labelSelector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "labelSelector allows to narrow down the selection of ClusterTrustBundles for a signer with a given `signerName`. If unset, interpreted as \"match nothing\". If set but empty, interpreted as \"match everything\".\n\nMutually-exclusive with `name`.",
+							Ref:         ref(metav1.LabelSelector{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			metav1.LabelSelector{}.OpenAPIModelName()},
 	}
 }
 

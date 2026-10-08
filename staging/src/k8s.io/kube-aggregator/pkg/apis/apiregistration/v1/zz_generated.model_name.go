@@ -47,6 +47,11 @@ func (in APIServiceStatus) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ClusterTrustBundleSelector) OpenAPIModelName() string {
+	return "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.ClusterTrustBundleSelector"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ServiceReference) OpenAPIModelName() string {
 	return "io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.ServiceReference"
 }

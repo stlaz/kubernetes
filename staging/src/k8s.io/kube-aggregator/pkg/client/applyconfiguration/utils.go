@@ -42,6 +42,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiregistrationv1.APIServiceSpecApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("APIServiceStatus"):
 		return &apiregistrationv1.APIServiceStatusApplyConfiguration{}
+	case v1.SchemeGroupVersion.WithKind("ClusterTrustBundleSelector"):
+		return &apiregistrationv1.ClusterTrustBundleSelectorApplyConfiguration{}
 	case v1.SchemeGroupVersion.WithKind("ServiceReference"):
 		return &apiregistrationv1.ServiceReferenceApplyConfiguration{}
 

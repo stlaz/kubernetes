@@ -56,6 +56,18 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+- name: io.k8s.api.admissionregistration.v1.ClusterTrustBundleSelector
+  map:
+    fields:
+    - name: LabelSelector
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+    - name: Name
+      type:
+        scalar: string
+    - name: SignerName
+      type:
+        scalar: string
 - name: io.k8s.api.admissionregistration.v1.ExpressionWarning
   map:
     fields:
@@ -609,6 +621,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.admissionregistration.v1.WebhookClientConfig
   map:
     fields:
+    - name: ClusterTrustBundle
+      type:
+        namedType: io.k8s.api.admissionregistration.v1.ClusterTrustBundleSelector
     - name: caBundle
       type:
         scalar: string

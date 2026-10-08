@@ -56,6 +56,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		v1.Scale{}.OpenAPIModelName():                                          schema_k8sio_api_autoscaling_v1_Scale(ref),
 		v1.ScaleSpec{}.OpenAPIModelName():                                      schema_k8sio_api_autoscaling_v1_ScaleSpec(ref),
 		v1.ScaleStatus{}.OpenAPIModelName():                                    schema_k8sio_api_autoscaling_v1_ScaleStatus(ref),
+		apiextensionsv1.ClusterTrustBundleSelector{}.OpenAPIModelName():        schema_pkg_apis_apiextensions_v1_ClusterTrustBundleSelector(ref),
 		apiextensionsv1.ConversionRequest{}.OpenAPIModelName():                 schema_pkg_apis_apiextensions_v1_ConversionRequest(ref),
 		apiextensionsv1.ConversionResponse{}.OpenAPIModelName():                schema_pkg_apis_apiextensions_v1_ConversionResponse(ref),
 		apiextensionsv1.ConversionReview{}.OpenAPIModelName():                  schema_pkg_apis_apiextensions_v1_ConversionReview(ref),
@@ -1091,6 +1092,41 @@ func schema_k8sio_api_autoscaling_v1_ScaleStatus(ref common.ReferenceCallback) c
 				Required: []string{"replicas"},
 			},
 		},
+	}
+}
+
+func schema_pkg_apis_apiextensions_v1_ClusterTrustBundleSelector(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "clusterTrustBundleSelector allows to configure trust by poiting to a selection of ClusterTrustBundles",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"Name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name selects a single ClusterTrustBundle by name.\n\nMutually-exclusive with `signerName` and `labelSelector`.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"SignerName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "signerName selects all ClusterTrustBundles for a signer with matching name. The selection can be narrowed down by using `labelSelector`. The contents of all selected ClusterTrustBundles will be unified and deduplicated.\n\nMutually-exclusive with `name`.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"LabelSelector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "labelSelector allows to narrow down the selection of ClusterTrustBundles for a signer with a given `signerName`. If unset, interpreted as \"match nothing\". If set but empty, interpreted as \"match everything\".\n\nMutually-exclusive with `name`.",
+							Ref:         ref(metav1.LabelSelector{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			metav1.LabelSelector{}.OpenAPIModelName()},
 	}
 }
 
@@ -2519,11 +2555,17 @@ func schema_pkg_apis_apiextensions_v1_WebhookClientConfig(ref common.ReferenceCa
 							Format:      "byte",
 						},
 					},
+					"ClusterTrustBundle": {
+						SchemaProps: spec.SchemaProps{
+							Description: "clusterTrustBundle allows to select ClusterTrustBundle objects to source trust from to validate API server's serving certificate. If both CABundle and ClusterTrustBundle are unspecified, system trust roots on the apiserver are used.",
+							Ref:         ref(apiextensionsv1.ClusterTrustBundleSelector{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			apiextensionsv1.ServiceReference{}.OpenAPIModelName()},
+			apiextensionsv1.ClusterTrustBundleSelector{}.OpenAPIModelName(), apiextensionsv1.ServiceReference{}.OpenAPIModelName()},
 	}
 }
 

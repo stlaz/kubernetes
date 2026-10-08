@@ -39,6 +39,18 @@ func Parser() *typed.Parser {
 var parserOnce sync.Once
 var parser *typed.Parser
 var schemaYAML = typed.YAMLObject(`types:
+- name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.ClusterTrustBundleSelector
+  map:
+    fields:
+    - name: LabelSelector
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+    - name: Name
+      type:
+        scalar: string
+    - name: SignerName
+      type:
+        scalar: string
 - name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceColumnDefinition
   map:
     fields:
@@ -541,6 +553,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.WebhookClientConfig
   map:
     fields:
+    - name: ClusterTrustBundle
+      type:
+        namedType: io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.ClusterTrustBundleSelector
     - name: caBundle
       type:
         scalar: string
@@ -1112,6 +1127,38 @@ var schemaYAML = typed.YAMLObject(`types:
         elementType:
           namedType: __untyped_deduced_
         elementRelationship: separable
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+  map:
+    fields:
+    - name: matchExpressions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement
+          elementRelationship: atomic
+    - name: matchLabels
+      type:
+        map:
+          elementType:
+            scalar: string
+    elementRelationship: atomic
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement
+  map:
+    fields:
+    - name: key
+      type:
+        scalar: string
+      default: ""
+    - name: operator
+      type:
+        scalar: string
+      default: ""
+    - name: values
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
 - name: io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry
   map:
     fields:

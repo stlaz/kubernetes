@@ -32,6 +32,11 @@ func (in AuditAnnotation) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in ClusterTrustBundleSelector) OpenAPIModelName() string {
+	return "io.k8s.api.admissionregistration.v1.ClusterTrustBundleSelector"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in ExpressionWarning) OpenAPIModelName() string {
 	return "io.k8s.api.admissionregistration.v1.ExpressionWarning"
 }

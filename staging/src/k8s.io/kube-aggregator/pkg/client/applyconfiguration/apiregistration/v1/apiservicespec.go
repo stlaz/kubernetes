@@ -37,8 +37,12 @@ type APIServiceSpecApplyConfiguration struct {
 	// This is strongly discouraged.  You should use the CABundle instead.
 	InsecureSkipTLSVerify *bool `json:"insecureSkipTLSVerify,omitempty"`
 	// CABundle is a PEM encoded CA bundle which will be used to validate an API server's serving certificate.
-	// If unspecified, system trust roots on the apiserver are used.
+	// If both CABundle and ClusterTrustBundle are unspecified, system trust roots on the apiserver are used.
 	CABundle []byte `json:"caBundle,omitempty"`
+	// clusterTrustBundle allows to select ClusterTrustBundle objects to source trust from to validate
+	// API server's serving certificate.
+	// If both CABundle and ClusterTrustBundle are unspecified, system trust roots on the apiserver are used.
+	ClusterTrustBundle *ClusterTrustBundleSelectorApplyConfiguration `json:"clusterTrustBundle,omitempty"`
 	// GroupPriorityMinimum is the priority this group should have at least. Higher priority means that the group is preferred by clients over lower priority ones.
 	// Note that other versions of this group might specify even higher GroupPriorityMinimum values such that the whole group gets a higher priority.
 	// The primary sort is based on GroupPriorityMinimum, ordered highest number to lowest (20 before 10).
@@ -104,6 +108,14 @@ func (b *APIServiceSpecApplyConfiguration) WithCABundle(values ...byte) *APIServ
 	for i := range values {
 		b.CABundle = append(b.CABundle, values[i])
 	}
+	return b
+}
+
+// WithClusterTrustBundle sets the ClusterTrustBundle field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ClusterTrustBundle field is set to the value of the last call.
+func (b *APIServiceSpecApplyConfiguration) WithClusterTrustBundle(value *ClusterTrustBundleSelectorApplyConfiguration) *APIServiceSpecApplyConfiguration {
+	b.ClusterTrustBundle = value
 	return b
 }
 

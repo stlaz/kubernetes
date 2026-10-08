@@ -97,10 +97,18 @@ message APIServiceSpec {
   optional bool insecureSkipTLSVerify = 4;
 
   // CABundle is a PEM encoded CA bundle which will be used to validate an API server's serving certificate.
-  // If unspecified, system trust roots on the apiserver are used.
+  // If both CABundle and ClusterTrustBundle are unspecified, system trust roots on the apiserver are used.
   // +listType=atomic
   // +optional
   optional bytes caBundle = 5;
+
+  // clusterTrustBundle allows to select ClusterTrustBundle objects to source trust from to validate
+  // API server's serving certificate.
+  // If both CABundle and ClusterTrustBundle are unspecified, system trust roots on the apiserver are used.
+  //
+  // +featureGate=ClusterTrustBundleSelector
+  // +optional
+  optional ClusterTrustBundleSelector clusterTrustBundle = 9;
 
   // GroupPriorityMinimum is the priority this group should have at least. Higher priority means that the group is preferred by clients over lower priority ones.
   // Note that other versions of this group might specify even higher GroupPriorityMinimum values such that the whole group gets a higher priority.
@@ -132,6 +140,35 @@ message APIServiceStatus {
   // +listType=map
   // +listMapKey=type
   repeated APIServiceCondition conditions = 1;
+}
+
+// clusterTrustBundleSelector allows to configure trust by poiting to
+// a selection of ClusterTrustBundles
+message ClusterTrustBundleSelector {
+  // name selects a single ClusterTrustBundle by name.
+  //
+  // Mutually-exclusive with `signerName` and `labelSelector`.
+  // +optional
+  optional string name = 1;
+
+  // signerName selects all ClusterTrustBundles for a signer with
+  // matching name.
+  // The selection can be narrowed down by using `labelSelector`.
+  // The contents of all selected ClusterTrustBundles will be
+  // unified and deduplicated.
+  //
+  // Mutually-exclusive with `name`.
+  // +optional
+  optional string signerName = 2;
+
+  // labelSelector allows to narrow down the selection of
+  // ClusterTrustBundles for a signer with a given `signerName`.
+  // If unset, interpreted as "match nothing". If set but empty,
+  // interpreted as "match everything".
+  //
+  // Mutually-exclusive with `name`.
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labelSelector = 3;
 }
 
 // ServiceReference holds a reference to Service.legacy.k8s.io

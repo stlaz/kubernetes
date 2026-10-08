@@ -51,6 +51,38 @@ var schemaYAML = typed.YAMLObject(`types:
         elementType:
           namedType: __untyped_deduced_
         elementRelationship: separable
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+  map:
+    fields:
+    - name: matchExpressions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement
+          elementRelationship: atomic
+    - name: matchLabels
+      type:
+        map:
+          elementType:
+            scalar: string
+    elementRelationship: atomic
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement
+  map:
+    fields:
+    - name: key
+      type:
+        scalar: string
+      default: ""
+    - name: operator
+      type:
+        scalar: string
+      default: ""
+    - name: values
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
 - name: io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry
   map:
     fields:
@@ -213,6 +245,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: caBundle
       type:
         scalar: string
+    - name: clusterTrustBundle
+      type:
+        namedType: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.ClusterTrustBundleSelector
     - name: group
       type:
         scalar: string
@@ -244,6 +279,18 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - type
+- name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.ClusterTrustBundleSelector
+  map:
+    fields:
+    - name: labelSelector
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+    - name: name
+      type:
+        scalar: string
+    - name: signerName
+      type:
+        scalar: string
 - name: io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.ServiceReference
   map:
     fields:

@@ -28,6 +28,35 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1";
 
+// clusterTrustBundleSelector allows to configure trust by poiting to
+// a selection of ClusterTrustBundles
+message ClusterTrustBundleSelector {
+  // name selects a single ClusterTrustBundle by name.
+  //
+  // Mutually-exclusive with `signerName` and `labelSelector`.
+  // +optional
+  optional string name = 1;
+
+  // signerName selects all ClusterTrustBundles for a signer with
+  // matching name.
+  // The selection can be narrowed down by using `labelSelector`.
+  // The contents of all selected ClusterTrustBundles will be
+  // unified and deduplicated.
+  //
+  // Mutually-exclusive with `name`.
+  // +optional
+  optional string signerName = 2;
+
+  // labelSelector allows to narrow down the selection of
+  // ClusterTrustBundles for a signer with a given `signerName`.
+  // If unset, interpreted as "match nothing". If set but empty,
+  // interpreted as "match everything".
+  //
+  // Mutually-exclusive with `name`.
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector labelSelector = 3;
+}
+
 // ConversionRequest describes the conversion request parameters.
 message ConversionRequest {
   // uid is an identifier for the individual request/response. It allows distinguishing instances of requests which are
@@ -819,6 +848,14 @@ message WebhookClientConfig {
   // If unspecified, system trust roots on the apiserver are used.
   // +optional
   optional bytes caBundle = 2;
+
+  // clusterTrustBundle allows to select ClusterTrustBundle objects to source trust from to validate
+  // API server's serving certificate.
+  // If both CABundle and ClusterTrustBundle are unspecified, system trust roots on the apiserver are used.
+  //
+  // +featureGate=ClusterTrustBundleSelector
+  // +optional
+  optional ClusterTrustBundleSelector clusterTrustBundle = 4;
 }
 
 // WebhookConversion describes how to call a conversion webhook

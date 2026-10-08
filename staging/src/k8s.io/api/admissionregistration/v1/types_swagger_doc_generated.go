@@ -46,6 +46,17 @@ func (AuditAnnotation) SwaggerDoc() map[string]string {
 	return map_AuditAnnotation
 }
 
+var map_ClusterTrustBundleSelector = map[string]string{
+	"":              "clusterTrustBundleSelector allows to configure trust by poiting to a selection of ClusterTrustBundles",
+	"Name":          "name selects a single ClusterTrustBundle by name.\n\nMutually-exclusive with `signerName` and `labelSelector`.",
+	"SignerName":    "signerName selects all ClusterTrustBundles for a signer with matching name. The selection can be narrowed down by using `labelSelector`. The contents of all selected ClusterTrustBundles will be unified and deduplicated.\n\nMutually-exclusive with `name`.",
+	"LabelSelector": "labelSelector allows to narrow down the selection of ClusterTrustBundles for a signer with a given `signerName`. If unset, interpreted as \"match nothing\". If set but empty, interpreted as \"match everything\".\n\nMutually-exclusive with `name`.",
+}
+
+func (ClusterTrustBundleSelector) SwaggerDoc() map[string]string {
+	return map_ClusterTrustBundleSelector
+}
+
 var map_ExpressionWarning = map[string]string{
 	"":         "ExpressionWarning is a warning information that targets a specific expression.",
 	"fieldRef": "fieldRef is the path to the field that refers to the expression. For example, the reference to the expression of the first item of validations is \"spec.validations[0].expression\"",
@@ -419,10 +430,11 @@ func (Variable) SwaggerDoc() map[string]string {
 }
 
 var map_WebhookClientConfig = map[string]string{
-	"":         "WebhookClientConfig contains the information to make a TLS connection with the webhook",
-	"url":      "url gives the location of the webhook, in standard URL form (`scheme://host:port/path`). Exactly one of `url` or `service` must be specified.\n\nThe `host` should not refer to a service running in the cluster; use the `service` field instead. The host might be resolved via external DNS in some apiservers (e.g., `kube-apiserver` cannot resolve in-cluster DNS as that would be a layering violation). `host` may also be an IP address.\n\nPlease note that using `localhost` or `127.0.0.1` as a `host` is risky unless you take great care to run this webhook on all hosts which run an apiserver which might need to make calls to this webhook. Such installs are likely to be non-portable, i.e., not easy to turn up in a new cluster.\n\nThe scheme must be \"https\"; the URL must begin with \"https://\".\n\nA path is optional, and if present may be any string permissible in a URL. You may use the path to pass an arbitrary string to the webhook, for example, a cluster identifier.\n\nAttempting to use a user or basic auth e.g. \"user:password@\" is not allowed. Fragments (\"#...\") and query parameters (\"?...\") are not allowed, either.",
-	"service":  "service is a reference to the service for this webhook. Either `service` or `url` must be specified.\n\nIf the webhook is running within the cluster, then you should use `service`.",
-	"caBundle": "caBundle is a PEM encoded CA bundle which will be used to validate the webhook's server certificate. If unspecified, system trust roots on the apiserver are used.",
+	"":                   "WebhookClientConfig contains the information to make a TLS connection with the webhook",
+	"url":                "url gives the location of the webhook, in standard URL form (`scheme://host:port/path`). Exactly one of `url` or `service` must be specified.\n\nThe `host` should not refer to a service running in the cluster; use the `service` field instead. The host might be resolved via external DNS in some apiservers (e.g., `kube-apiserver` cannot resolve in-cluster DNS as that would be a layering violation). `host` may also be an IP address.\n\nPlease note that using `localhost` or `127.0.0.1` as a `host` is risky unless you take great care to run this webhook on all hosts which run an apiserver which might need to make calls to this webhook. Such installs are likely to be non-portable, i.e., not easy to turn up in a new cluster.\n\nThe scheme must be \"https\"; the URL must begin with \"https://\".\n\nA path is optional, and if present may be any string permissible in a URL. You may use the path to pass an arbitrary string to the webhook, for example, a cluster identifier.\n\nAttempting to use a user or basic auth e.g. \"user:password@\" is not allowed. Fragments (\"#...\") and query parameters (\"?...\") are not allowed, either.",
+	"service":            "service is a reference to the service for this webhook. Either `service` or `url` must be specified.\n\nIf the webhook is running within the cluster, then you should use `service`.",
+	"caBundle":           "caBundle is a PEM encoded CA bundle which will be used to validate the webhook's server certificate. If unspecified, system trust roots on the apiserver are used.",
+	"ClusterTrustBundle": "clusterTrustBundle allows to select ClusterTrustBundle objects to source trust from to validate API server's serving certificate. If both CABundle and ClusterTrustBundle are unspecified, system trust roots on the apiserver are used.",
 }
 
 func (WebhookClientConfig) SwaggerDoc() map[string]string {
