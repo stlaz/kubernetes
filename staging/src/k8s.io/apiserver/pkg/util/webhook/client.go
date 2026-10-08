@@ -47,7 +47,7 @@ const (
 type ClientConfig struct {
 	Name     string
 	URL      string
-	CABundle []byte
+	CABundle []byte // FIXME: should be a provider?
 	Service  *ClientConfigService
 }
 

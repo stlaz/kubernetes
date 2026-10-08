@@ -1328,7 +1328,7 @@ func TestCascadingDeleteOnCRDConversionFailure(t *testing.T) {
 					Name:      "foobar",
 					Namespace: ns.Name,
 				},
-				CABundle: testCert,
+				CABundle: testCert, // TODO: clustertrustbundle?
 			},
 			ConversionReviewVersions: []string{
 				"v1", "v1beta1",

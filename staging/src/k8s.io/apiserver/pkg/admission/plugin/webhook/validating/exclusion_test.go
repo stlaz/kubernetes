@@ -60,7 +60,7 @@ func TestExcludeVirtualResources(t *testing.T) {
 		}},
 		ClientConfig: registrationv1.WebhookClientConfig{
 			Service:  &registrationv1.ServiceReference{Name: "webhook-test", Namespace: "default", Path: &path},
-			CABundle: testcerts.CACert,
+			CABundle: testcerts.CACert, // TODO: clustertrustbundle?
 		},
 		FailurePolicy: &fail,
 		SideEffects:   &none,

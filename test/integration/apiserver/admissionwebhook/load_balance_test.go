@@ -145,7 +145,7 @@ func TestWebhookLoadBalance(t *testing.T) {
 			}
 
 			webhooksClientConfig := admissionregistrationv1.WebhookClientConfig{
-				CABundle: localhostCert,
+				CABundle: localhostCert, // TODO: clustertrustbundle?
 			}
 			if tc.http2 {
 				webhooksClientConfig.URL = &webhookURL

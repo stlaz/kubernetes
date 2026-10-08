@@ -630,6 +630,7 @@ func validateCustomResourceConversion(conversion *apiextensions.CustomResourceCo
 			case cc.Service != nil:
 				allErrs = append(allErrs, webhook.ValidateWebhookService(fldPath.Child("webhookClientConfig").Child("service"), cc.Service.Name, cc.Service.Namespace, cc.Service.Path, cc.Service.Port)...)
 			}
+			// TODO: extend validation here for ClusterTrustBundle
 			if len(cc.CABundle) > 0 && !opts.allowInvalidCABundle {
 				allErrs = append(allErrs, webhook.ValidateCABundle(fldPath.Child("webhookClientConfig").Child("caBundle"), cc.CABundle)...)
 			}

@@ -1588,7 +1588,7 @@ func createV1beta1ValidationWebhook(etcdClient *clientv3.Client, etcdStoragePref
 				Name: "admission.integration.test",
 				ClientConfig: admissionregistrationv1beta1.WebhookClientConfig{
 					URL:      &endpoint,
-					CABundle: localhostCert,
+					CABundle: localhostCert, // TODO: clustertrustbundle?
 				},
 				Rules: []admissionregistrationv1beta1.RuleWithOperations{{
 					Operations: []admissionregistrationv1beta1.OperationType{admissionregistrationv1beta1.OperationAll},

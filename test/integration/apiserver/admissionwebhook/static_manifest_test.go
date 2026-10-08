@@ -204,7 +204,7 @@ func TestStaticWebhookComprehensive(t *testing.T) {
 			Name: "comprehensive-validating-webhook.static.k8s.io",
 			ClientConfig: admissionregistrationv1.WebhookClientConfig{
 				URL:      &validatingServer.URL,
-				CABundle: validatingCACert,
+				CABundle: validatingCACert, // TODO: clustertrustbundle?
 			},
 			Rules: []admissionregistrationv1.RuleWithOperations{
 				{

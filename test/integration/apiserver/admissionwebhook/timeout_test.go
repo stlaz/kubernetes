@@ -202,7 +202,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 					Name: name,
 					ClientConfig: admissionregistrationv1.WebhookClientConfig{
 						URL:      &endpoint,
-						CABundle: localhostCert,
+						CABundle: localhostCert, // TODO: clustertrustbundle?
 					},
 					Rules: []admissionregistrationv1.RuleWithOperations{{
 						Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},

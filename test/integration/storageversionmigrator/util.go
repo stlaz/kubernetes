@@ -756,7 +756,7 @@ func (svm *svmTest) createCRD(
 			Strategy: apiextensionsv1.WebhookConverter,
 			Webhook: &apiextensionsv1.WebhookConversion{
 				ClientConfig: &apiextensionsv1.WebhookClientConfig{
-					CABundle: certCtx.signingCert,
+					CABundle: certCtx.signingCert, // TODO: clustertrustbundle?
 					URL: ptr.To(
 						fmt.Sprintf("https://127.0.0.1:%d/%s", servicePort, webhookHandler),
 					),

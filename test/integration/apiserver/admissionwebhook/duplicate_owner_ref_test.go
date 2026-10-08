@@ -88,7 +88,7 @@ func TestMutatingWebhookDuplicateOwnerReferences(t *testing.T) {
 			Name: "dup-owner-references.admission.integration.test",
 			ClientConfig: admissionv1.WebhookClientConfig{
 				URL:      &webhookServer.URL,
-				CABundle: localhostCert,
+				CABundle: localhostCert, // TODO: clustertrustbundle?
 			},
 			Rules: []admissionv1.RuleWithOperations{{
 				Operations: []admissionv1.OperationType{admissionv1.Create, admissionv1.Update},

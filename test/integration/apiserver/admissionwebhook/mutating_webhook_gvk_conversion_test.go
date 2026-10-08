@@ -210,7 +210,7 @@ func Test_MutatingWebhookConvertsGVKWithMatchPolicyEquivalent(t *testing.T) {
 				MatchPolicy: &equivalent,
 				ClientConfig: admissionregistrationv1.WebhookClientConfig{
 					URL:      &v2Endpoint,
-					CABundle: localhostCert,
+					CABundle: localhostCert, // TODO: clustertrustbundle?
 				},
 				FailurePolicy:           &ignore,
 				SideEffects:             &noSideEffects,

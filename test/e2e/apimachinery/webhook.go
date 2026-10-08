@@ -1034,7 +1034,7 @@ func newValidatingWebhookWithMatchConditions(
 						Path:      ptr.To("/always-deny"),
 						Port:      ptr.To[int32](servicePort),
 					},
-					CABundle: certCtx.signingCert,
+					CABundle: certCtx.signingCert, // TODO: clustertrustbundle?
 				},
 				SideEffects:             &sideEffects,
 				MatchPolicy:             &equivalent,

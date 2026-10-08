@@ -173,7 +173,7 @@ plugins:
 			Name: "admission.integration.test",
 			ClientConfig: admissionregistrationv1.WebhookClientConfig{
 				URL:      &webhookServer.URL,
-				CABundle: localhostCert,
+				CABundle: localhostCert, // TODO: clustertrustbundle?
 			},
 			Rules: []admissionregistrationv1.RuleWithOperations{{
 				Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},

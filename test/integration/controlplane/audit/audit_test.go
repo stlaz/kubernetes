@@ -684,7 +684,7 @@ func createMutationWebhook(client clientset.Interface, endpoint string) error {
 			Name: testWebhookName,
 			ClientConfig: admissionregistrationv1.WebhookClientConfig{
 				URL:      &endpoint,
-				CABundle: utils.LocalhostCert,
+				CABundle: utils.LocalhostCert, // TODO: clustertrustbundle?
 			},
 			Rules: []admissionregistrationv1.RuleWithOperations{{
 				Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},

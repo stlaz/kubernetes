@@ -67,7 +67,7 @@ func TestInvalidCABundle(t *testing.T) {
 		Strategy: apiextensionsv1.WebhookConverter,
 		Webhook: &apiextensionsv1.WebhookConversion{
 			ClientConfig: &apiextensionsv1.WebhookClientConfig{
-				CABundle: invalidCert,
+				CABundle: invalidCert, // TODO: add tests for ClusterTrustBundle configs
 				Service: &apiextensionsv1.ServiceReference{
 					Namespace: "default",
 					Name:      "example",

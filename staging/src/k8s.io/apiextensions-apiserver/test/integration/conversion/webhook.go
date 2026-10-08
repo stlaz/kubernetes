@@ -59,7 +59,7 @@ func StartConversionWebhookServer(handler http.Handler) (func(), *apiextensionsv
 	webhookServer.StartTLS()
 	endpoint := webhookServer.URL + "/convert"
 	webhookConfig := &apiextensionsv1.WebhookClientConfig{
-		CABundle: localhostCert,
+		CABundle: localhostCert, // TODO: can we add ClusterTrustBundle handling here?
 		URL:      &endpoint,
 	}
 

@@ -175,7 +175,7 @@ func brokenWebhookConfig(name string) *admissionregistrationv1.ValidatingWebhook
 						Name:      "invalid-webhook-service",
 						Path:      &path,
 					},
-					CABundle: nil,
+					CABundle: nil, // TODO: clustertrustbundle?
 				},
 				FailurePolicy:           &failurePolicy,
 				SideEffects:             &noSideEffects,

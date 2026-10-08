@@ -207,7 +207,7 @@ func (c urlConfigGenerator) ccfgURL(urlPath string) registrationv1.WebhookClient
 	urlString := u2.String()
 	return registrationv1.WebhookClientConfig{
 		URL:      &urlString,
-		CABundle: testcerts.CACert,
+		CABundle: testcerts.CACert, // TODO: clustertrustbundle?
 	}
 }
 

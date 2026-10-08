@@ -361,7 +361,7 @@ func TestMatchConditions(t *testing.T) {
 						}},
 						ClientConfig: admissionregistrationv1.WebhookClientConfig{
 							URL:      &endpoint,
-							CABundle: localhostCert,
+							CABundle: localhostCert, // TODO: clustertrustbundle?
 						},
 						// ignore pods in the marker namespace
 						NamespaceSelector: &metav1.LabelSelector{

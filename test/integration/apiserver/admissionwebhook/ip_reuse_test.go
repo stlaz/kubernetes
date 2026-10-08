@@ -190,7 +190,7 @@ func TestWebhookConnectionPoolIPReuse(t *testing.T) {
 		Webhooks: []admissionregistrationv1.ValidatingWebhook{{
 			Name: "ip-reuse.integration.test",
 			ClientConfig: admissionregistrationv1.WebhookClientConfig{
-				CABundle: localhostCert,
+				CABundle: localhostCert, // TODO: clustertrustbundle?
 				Service: &admissionregistrationv1.ServiceReference{
 					Namespace: "test",
 					Name:      "webhook",

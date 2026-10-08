@@ -143,7 +143,7 @@ func TestEgressToWebhookWithProxy(t *testing.T) {
 				Name: "test-proxy.example.com",
 				ClientConfig: admissionregistrationv1.WebhookClientConfig{
 					URL:      &webhookURL,
-					CABundle: caCertPEM,
+					CABundle: caCertPEM, // TODO: clustertrustbundle?
 				},
 				Rules: []admissionregistrationv1.RuleWithOperations{
 					{

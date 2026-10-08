@@ -226,7 +226,7 @@ func installWebhook(t *testing.T, clientConfig *rest.Config, addr string) error 
 				Name: "podsecurity-webhook.integration.test",
 				ClientConfig: admissionregistrationv1.WebhookClientConfig{
 					URL:      &endpoint,
-					CABundle: utiltest.LocalhostCert,
+					CABundle: utiltest.LocalhostCert, // TODO: clustertrustbundle?
 				},
 				Rules: []admissionregistrationv1.RuleWithOperations{
 					{
