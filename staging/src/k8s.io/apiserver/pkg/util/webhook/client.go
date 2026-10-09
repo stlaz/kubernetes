@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/x509metrics"
 	"k8s.io/client-go/rest"
@@ -47,7 +48,7 @@ const (
 type ClientConfig struct {
 	Name     string
 	URL      string
-	CABundle []byte // FIXME: should be a provider?
+	CABundle dynamiccertificates.CAContentProvider // FIXME: should be a provider?
 	Service  *ClientConfigService
 }
 
