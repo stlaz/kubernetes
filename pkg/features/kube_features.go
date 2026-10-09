@@ -77,6 +77,13 @@ const (
 	// See: https://github.com/kubernetes/kubernetes/issues/133515
 	AuthorizePodWebsocketUpgradeCreatePermission featuregate.Feature = "AuthorizePodWebsocketUpgradeCreatePermission"
 
+	// owner: @stlaz
+	// kep: https://kep.k8s.io/6283
+	//
+	// Allows using ClusterTrustBundles selectors for trust in webhook clientconfigurations
+	// and APIServices.
+	ClusterTrustBundleSelector featuregate.Feature = "ClusterTrustBundleSelector"
+
 	// owner: @szuecs
 	//
 	// Enable nodes to change CPUCFSQuotaPeriod
@@ -1305,6 +1312,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	AuthorizePodWebsocketUpgradeCreatePermission: {
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	ClusterTrustBundleSelector: {
+		{Version: version.MustParse("1.38"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	CPUCFSQuotaPeriod: {
