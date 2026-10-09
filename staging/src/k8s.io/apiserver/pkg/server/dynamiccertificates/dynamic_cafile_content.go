@@ -20,13 +20,11 @@ import (
 	"bytes"
 	"context"
 	"crypto/x509"
-	"errors"
 	"fmt"
-	"os"
 	"sync/atomic"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates/cacontent"
 	"k8s.io/client-go/util/cert"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -55,14 +53,24 @@ type DynamicFileCAContent struct {
 	// filename is the name the file to read.
 	filename string
 
-	// caBundle is a caBundleAndVerifier that contains the last read, non-zero length content of the file
+	*embedDynamicCAContent
+}
+
+type DynamicCAContent struct {
+	name string
+
 	caBundle atomic.Value
+
+	caPEMAccessor cacontent.CAContentAccessor
 
 	listeners []Listener
 
 	// queue only ever has one item, but it has nice error handling backoff/retry semantics
-	queue workqueue.TypedRateLimitingInterface[string]
+	queue workqueue.TypedRateLimitingInterface[struct{}]
 }
+
+// type alias for privately embedding the struct
+type embedDynamicCAContent = DynamicCAContent
 
 var _ Notifier = &DynamicFileCAContent{}
 var _ CAContentProvider = &DynamicFileCAContent{}
@@ -80,14 +88,29 @@ func NewDynamicCAContentFromFile(purpose, filename string) (*DynamicFileCAConten
 	}
 	name := fmt.Sprintf("%s::%s", purpose, filename)
 
-	ret := &DynamicFileCAContent{
-		name:     name,
-		filename: filename,
+	fileAccessor := cacontent.NewFileCAContentAccessor(filename)
+
+	dynamicContent, err := NewDynamicCAContent(name, fileAccessor)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DynamicFileCAContent{
+		name:             name,
+		DynamicCAContent: dynamicContent,
+	}, nil
+}
+
+func NewDynamicCAContent(name string, caPEMAccessor cacontent.CAContentAccessor) (*DynamicCAContent, error) {
+	ret := &DynamicCAContent{
+		name:          name,
+		caPEMAccessor: caPEMAccessor,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
-			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: fmt.Sprintf("DynamicCABundle-%s", purpose)},
+			workqueue.DefaultTypedControllerRateLimiter[struct{}](),
+			workqueue.TypedRateLimitingQueueConfig[struct{}]{Name: fmt.Sprintf("DynamicCABundle-%s", name)},
 		),
 	}
+
 	if err := ret.loadCABundle(); err != nil {
 		return nil, err
 	}
@@ -96,16 +119,14 @@ func NewDynamicCAContentFromFile(purpose, filename string) (*DynamicFileCAConten
 }
 
 // AddListener adds a listener to be notified when the CA content changes.
-func (c *DynamicFileCAContent) AddListener(listener Listener) {
+func (c *DynamicCAContent) AddListener(listener Listener) {
 	c.listeners = append(c.listeners, listener)
 }
 
 // loadCABundle determines the next set of content for the file.
-func (c *DynamicFileCAContent) loadCABundle() error {
-	caBundle, err := os.ReadFile(c.filename)
-	if err != nil {
-		return err
-	}
+func (c *DynamicCAContent) loadCABundle() error {
+	caBundle, err := c.caPEMAccessor.GetPEMBundle()
+
 	if len(caBundle) == 0 {
 		return fmt.Errorf("missing content for CA bundle %q", c.Name())
 	}
@@ -130,7 +151,7 @@ func (c *DynamicFileCAContent) loadCABundle() error {
 }
 
 // hasCAChanged returns true if the caBundle is different than the current.
-func (c *DynamicFileCAContent) hasCAChanged(caBundle []byte) bool {
+func (c *DynamicCAContent) hasCAChanged(caBundle []byte) bool {
 	uncastExisting := c.caBundle.Load()
 	if uncastExisting == nil {
 		return true
@@ -149,12 +170,12 @@ func (c *DynamicFileCAContent) hasCAChanged(caBundle []byte) bool {
 }
 
 // RunOnce runs a single sync loop
-func (c *DynamicFileCAContent) RunOnce(ctx context.Context) error {
+func (c *DynamicCAContent) RunOnce(ctx context.Context) error {
 	return c.loadCABundle()
 }
 
 // Run starts the controller and blocks until stopCh is closed.
-func (c *DynamicFileCAContent) Run(ctx context.Context, workers int) {
+func (c *DynamicCAContent) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrashWithContext(ctx)
 	defer c.queue.ShutDown()
 
@@ -164,68 +185,17 @@ func (c *DynamicFileCAContent) Run(ctx context.Context, workers int) {
 	// doesn't matter what workers say, only start one.
 	go wait.Until(c.runWorker, time.Second, ctx.Done())
 
-	// start the loop that watches the CA file until stopCh is closed.
-	go wait.Until(func() {
-		if err := c.watchCAFile(ctx.Done()); err != nil {
-			klog.ErrorS(err, "Failed to watch CA file, will retry later")
-		}
-	}, time.Minute, ctx.Done())
+	go c.caPEMAccessor.Watch(ctx, c.queue)
 
 	<-ctx.Done()
 }
 
-func (c *DynamicFileCAContent) watchCAFile(stopCh <-chan struct{}) error {
-	// Trigger a check here to ensure the content will be checked periodically even if the following watch fails.
-	c.queue.Add(workItemKey)
-
-	w, err := fsnotify.NewWatcher()
-	if err != nil {
-		return fmt.Errorf("error creating fsnotify watcher: %v", err)
-	}
-	defer w.Close()
-
-	if err = w.Add(c.filename); err != nil {
-		return fmt.Errorf("error adding watch for file %s: %v", c.filename, err)
-	}
-	// Trigger a check in case the file is updated before the watch starts.
-	c.queue.Add(workItemKey)
-
-	for {
-		select {
-		case e := <-w.Events:
-			if err := c.handleWatchEvent(e, w); err != nil {
-				return err
-			}
-		case err := <-w.Errors:
-			return fmt.Errorf("received fsnotify error: %v", err)
-		case <-stopCh:
-			return nil
-		}
-	}
-}
-
-// handleWatchEvent triggers reloading the CA file, and restarts a new watch if it's a Remove or Rename event.
-func (c *DynamicFileCAContent) handleWatchEvent(e fsnotify.Event, w *fsnotify.Watcher) error {
-	// This should be executed after restarting the watch (if applicable) to ensure no file event will be missing.
-	defer c.queue.Add(workItemKey)
-	if !e.Has(fsnotify.Remove) && !e.Has(fsnotify.Rename) {
-		return nil
-	}
-	if err := w.Remove(c.filename); err != nil && !errors.Is(err, fsnotify.ErrNonExistentWatch) {
-		klog.InfoS("Failed to remove file watch, it may have been deleted", "file", c.filename, "err", err)
-	}
-	if err := w.Add(c.filename); err != nil {
-		return fmt.Errorf("error adding watch for file %s: %v", c.filename, err)
-	}
-	return nil
-}
-
-func (c *DynamicFileCAContent) runWorker() {
+func (c *DynamicCAContent) runWorker() {
 	for c.processNextWorkItem() {
 	}
 }
 
-func (c *DynamicFileCAContent) processNextWorkItem() bool {
+func (c *DynamicCAContent) processNextWorkItem() bool {
 	dsKey, quit := c.queue.Get()
 	if quit {
 		return false
@@ -245,17 +215,17 @@ func (c *DynamicFileCAContent) processNextWorkItem() bool {
 }
 
 // Name is just an identifier
-func (c *DynamicFileCAContent) Name() string {
+func (c *DynamicCAContent) Name() string {
 	return c.name
 }
 
 // CurrentCABundleContent provides ca bundle byte content
-func (c *DynamicFileCAContent) CurrentCABundleContent() (cabundle []byte) {
+func (c *DynamicCAContent) CurrentCABundleContent() (cabundle []byte) {
 	return c.caBundle.Load().(*caBundleAndVerifier).caBundle
 }
 
 // VerifyOptions provides verifyoptions compatible with authenticators
-func (c *DynamicFileCAContent) VerifyOptions() (x509.VerifyOptions, bool) {
+func (c *DynamicCAContent) VerifyOptions() (x509.VerifyOptions, bool) {
 	uncastObj := c.caBundle.Load()
 	if uncastObj == nil {
 		return x509.VerifyOptions{}, false
