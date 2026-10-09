@@ -49,6 +49,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 )
 
@@ -171,6 +172,11 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 	s.Informers = externalinformers.NewSharedInformerFactory(crdClient, 5*time.Minute)
 
+	kubeClient, err := kubernetes.NewForConfig(s.GenericAPIServer.LoopbackClientConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kubernete clientset: %w", err)
+	}
+
 	delegateHandler := delegationTarget.UnprotectedHandler()
 	if delegateHandler == nil {
 		delegateHandler = http.NotFoundHandler()
@@ -188,6 +194,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	crdHandler, err := NewCustomResourceDefinitionHandler(
 		versionDiscoveryHandler,
 		groupDiscoveryHandler,
+		kubeClient,
 		s.Informers.Apiextensions().V1().CustomResourceDefinitions(),
 		delegateHandler,
 		c.ExtraConfig.CRDRESTOptionsGetter,

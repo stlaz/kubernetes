@@ -78,6 +78,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/pkg/warning"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/scale/scheme/autoscalingv1"
 	"k8s.io/client-go/tools/cache"
@@ -169,6 +170,7 @@ type crdStorageMap map[types.UID]*crdInfo
 func NewCustomResourceDefinitionHandler(
 	versionDiscoveryHandler *versionDiscoveryHandler,
 	groupDiscoveryHandler *groupDiscoveryHandler,
+	kubeClient kubernetes.Interface,
 	crdInformer informers.CustomResourceDefinitionInformer,
 	delegate http.Handler,
 	restOptionsGetter generic.RESTOptionsGetter,
@@ -205,7 +207,7 @@ func NewCustomResourceDefinitionHandler(
 			ret.removeDeadStorage()
 		},
 	})
-	crConverterFactory, err := conversion.NewCRConverterFactory(serviceResolver, authResolverWrapper)
+	crConverterFactory, err := conversion.NewCRConverterFactory(serviceResolver, authResolverWrapper, kubeClient)
 	if err != nil {
 		return nil, err
 	}

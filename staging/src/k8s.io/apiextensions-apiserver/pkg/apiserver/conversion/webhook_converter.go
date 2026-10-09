@@ -36,16 +36,20 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/component-base/tracing"
+	"k8s.io/klog/v2"
 )
 
 type webhookConverterFactory struct {
 	clientManager webhook.ClientManager
+	kubeClient    kubernetes.Interface
 }
 
-func newWebhookConverterFactory(serviceResolver webhook.ServiceResolver, authResolverWrapper webhook.AuthenticationInfoResolverWrapper) (*webhookConverterFactory, error) {
+func newWebhookConverterFactory(serviceResolver webhook.ServiceResolver, authResolverWrapper webhook.AuthenticationInfoResolverWrapper, kubeClient kubernetes.Interface) (*webhookConverterFactory, error) {
 	clientManager, err := webhook.NewClientManager(
 		[]schema.GroupVersion{v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion},
 		v1beta1.AddToScheme,
@@ -62,7 +66,7 @@ func newWebhookConverterFactory(serviceResolver webhook.ServiceResolver, authRes
 	clientManager.SetAuthenticationInfoResolver(authInfoResolver)
 	clientManager.SetAuthenticationInfoResolverWrapper(authResolverWrapper)
 	clientManager.SetServiceResolver(serviceResolver)
-	return &webhookConverterFactory{clientManager}, nil
+	return &webhookConverterFactory{clientManager, kubeClient}, nil
 }
 
 // webhookConverter is a converter that calls an external webhook to do the CR conversion.
@@ -75,13 +79,20 @@ type webhookConverter struct {
 	conversionReviewVersions []string
 }
 
-func webhookClientConfigForCRD(crd *v1.CustomResourceDefinition) *webhook.ClientConfig {
+func webhookClientConfigForCRD(kubeClient kubernetes.Interface, crd *v1.CustomResourceDefinition) *webhook.ClientConfig {
 	apiConfig := crd.Spec.Conversion.Webhook.ClientConfig
-	caBundle := apiConfig.CABundle
-	if len(caBundle) > 0 && len(bytes.TrimSpace(caBundle)) == 0 {
+	var caBundle dynamiccertificates.CAContentProvider
+	var err error
+	if apiCABundle := apiConfig.CABundle; len(bytes.TrimSpace(apiCABundle)) > 0 {
 		// treat whitespace-only caBundle as empty
-		caBundle = nil
+		caBundle, err = dynamiccertificates.NewStaticCAContent(crd.Name+"_conversion_trust", apiCABundle)
+	} else if ctbSelector := apiConfig.ClusterTrustBundle; ctbSelector != nil {
+		caBundle, err = dynamiccertificates.NewDynamicCAContentFromClusterTrustBundles(kubeClient, crd.Name+"_conversion_trust", *ctbSelector.SignerName)
 	}
+	if err != nil {
+		klog.Error("oh noes", err) // FIXME: return errors
+	}
+
 	ret := webhook.ClientConfig{
 		Name:     fmt.Sprintf("conversion_webhook_for_%s", crd.Name),
 		CABundle: caBundle,
@@ -105,7 +116,7 @@ func webhookClientConfigForCRD(crd *v1.CustomResourceDefinition) *webhook.Client
 var _ crConverterInterface = &webhookConverter{}
 
 func (f *webhookConverterFactory) NewWebhookConverter(crd *v1.CustomResourceDefinition) (*webhookConverter, error) {
-	restClient, err := f.clientManager.HookClient(*webhookClientConfigForCRD(crd))
+	restClient, err := f.clientManager.HookClient(*webhookClientConfigForCRD(f.kubeClient, crd))
 	if err != nil {
 		return nil, err
 	}

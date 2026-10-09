@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/webhook"
+	"k8s.io/client-go/kubernetes"
 	typedscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -42,9 +43,9 @@ type CRConverterFactory struct {
 var converterMetricFactorySingleton = newConverterMetricFactory()
 
 // NewCRConverterFactory creates a new CRConverterFactory
-func NewCRConverterFactory(serviceResolver webhook.ServiceResolver, authResolverWrapper webhook.AuthenticationInfoResolverWrapper) (*CRConverterFactory, error) {
+func NewCRConverterFactory(serviceResolver webhook.ServiceResolver, authResolverWrapper webhook.AuthenticationInfoResolverWrapper, kubeClient kubernetes.Interface) (*CRConverterFactory, error) {
 	converterFactory := &CRConverterFactory{}
-	webhookConverterFactory, err := newWebhookConverterFactory(serviceResolver, authResolverWrapper)
+	webhookConverterFactory, err := newWebhookConverterFactory(serviceResolver, authResolverWrapper, kubeClient)
 	if err != nil {
 		return nil, err
 	}
