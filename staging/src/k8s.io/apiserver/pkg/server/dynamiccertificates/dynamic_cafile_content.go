@@ -102,6 +102,7 @@ func NewDynamicCAContentFromFile(purpose, filename string) (*DynamicFileCAConten
 	}, nil
 }
 
+// TODO: this could probably just take a CTB client
 func NewDynamicCAContentFromClusterTrustBundles(kubeClient kubernetes.Interface, purpose, signerName string) (*DynamicCAContent, error) {
 	if len(signerName) == 0 {
 		return nil, fmt.Errorf("missing signer name for CA bundle")

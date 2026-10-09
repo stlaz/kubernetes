@@ -187,7 +187,7 @@ func BuildValidatingAccessors(configs []*admissionregistrationv1.ValidatingWebho
 			n := w.Name
 			uid := fmt.Sprintf("manifest/%s/%s/%d", config.Name, n, names[n])
 			names[n]++
-			accessors = append(accessors, webhook.NewValidatingWebhookAccessor(uid, config.Name, w))
+			accessors = append(accessors, webhook.NewValidatingWebhookAccessor(uid, config.Name, w, nil)) // TODO: I think we don't need to pass the client here since we don't allow CTBs for static admission?
 		}
 	}
 	return accessors
@@ -203,7 +203,7 @@ func BuildMutatingAccessors(configs []*admissionregistrationv1.MutatingWebhookCo
 			n := w.Name
 			uid := fmt.Sprintf("manifest/%s/%s/%d", config.Name, n, names[n])
 			names[n]++
-			accessors = append(accessors, webhook.NewMutatingWebhookAccessor(uid, config.Name, w))
+			accessors = append(accessors, webhook.NewMutatingWebhookAccessor(uid, config.Name, w, nil)) // TODO: I think we don't need to pass the client here since we don't allow CTBs for static admission?
 		}
 	}
 	return accessors
