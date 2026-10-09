@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"k8s.io/apiserver/pkg/server/dynamiccertificates/cacontent"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/cert"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -86,7 +87,7 @@ func NewDynamicCAContentFromFile(purpose, filename string) (*DynamicFileCAConten
 	if len(filename) == 0 {
 		return nil, fmt.Errorf("missing filename for ca bundle")
 	}
-	name := fmt.Sprintf("%s::%s", purpose, filename)
+	name := fmt.Sprintf("%s::file::%s", purpose, filename)
 
 	fileAccessor := cacontent.NewFileCAContentAccessor(filename)
 
@@ -96,9 +97,25 @@ func NewDynamicCAContentFromFile(purpose, filename string) (*DynamicFileCAConten
 	}
 
 	return &DynamicFileCAContent{
-		name:             name,
-		DynamicCAContent: dynamicContent,
+		name:                  name,
+		embedDynamicCAContent: dynamicContent,
 	}, nil
+}
+
+func NewDynamicCAContentFromClusterTrustBundles(kubeClient kubernetes.Interface, purpose, signerName string) (*DynamicCAContent, error) {
+	if len(signerName) == 0 {
+		return nil, fmt.Errorf("missing signer name for CA bundle")
+	}
+	name := fmt.Sprintf("%s::ctbSigner::%s", purpose, signerName)
+
+	ctbAccessor := cacontent.NewClusterTrustBundleProvider(kubeClient, signerName)
+
+	dynamicContent, err := NewDynamicCAContent(name, ctbAccessor)
+	if err != nil {
+		return nil, err
+	}
+
+	return dynamicContent, nil
 }
 
 func NewDynamicCAContent(name string, caPEMAccessor cacontent.CAContentAccessor) (*DynamicCAContent, error) {
