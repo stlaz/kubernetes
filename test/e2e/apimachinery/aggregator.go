@@ -27,6 +27,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	certv1 "k8s.io/api/certificates/v1"
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -46,6 +47,7 @@ import (
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
+	"k8s.io/kubernetes/pkg/features"
 	apimachineryutils "k8s.io/kubernetes/test/e2e/common/apimachinery"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
@@ -68,6 +70,9 @@ const (
 
 	defaultApiServiceGroupName = samplev1alpha1.GroupName
 	defaultApiServiceVersion   = "v1alpha1"
+
+	testSignerName         = "e2e.kubernetes.io/aggregator-tests"
+	clusterTrustBundleName = "e2e.kubernetes.io:aggregator-tests:testing"
 )
 
 var _ = SIGDescribe("Aggregator", func() {
@@ -101,7 +106,11 @@ var _ = SIGDescribe("Aggregator", func() {
 	*/
 	framework.ConformanceIt("Should be able to support the 1.17 Sample API Server using the current Aggregator [LinuxOnly]", func(ctx context.Context) {
 		// Testing a 1.17 version of the sample-apiserver
-		TestSampleAPIServer(ctx, f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer), defaultApiServiceGroupName, defaultApiServiceVersion)
+		TestSampleAPIServer(ctx, f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer), defaultApiServiceGroupName, defaultApiServiceVersion, false)
+	})
+	framework.It("Should be able to support the 1.17 Sample API Server using the current Aggregator [LinuxOnly]", framework.WithFeatureGate(features.ClusterTrustBundleSelector), func(ctx context.Context) {
+		// Testing a 1.17 version of the sample-apiserver, using ClusterTrustBundle for setting up trust
+		TestSampleAPIServer(ctx, f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer), defaultApiServiceGroupName, defaultApiServiceVersion, true)
 	})
 })
 
@@ -110,6 +119,7 @@ func cleanupSampleAPIServer(ctx context.Context, client clientset.Interface, agg
 	_ = aggrclient.ApiregistrationV1().APIServices().Delete(ctx, apiServiceName, metav1.DeleteOptions{})
 
 	_ = client.AppsV1().Deployments(n.namespace).Delete(ctx, "sample-apiserver-deployment", metav1.DeleteOptions{})
+	_ = client.CertificatesV1().ClusterTrustBundles().Delete(ctx, clusterTrustBundleName, metav1.DeleteOptions{})
 	_ = client.CoreV1().Secrets(n.namespace).Delete(ctx, "sample-apiserver-secret", metav1.DeleteOptions{})
 	_ = client.CoreV1().Services(n.namespace).Delete(ctx, "sample-api", metav1.DeleteOptions{})
 	_ = client.CoreV1().ServiceAccounts(n.namespace).Delete(ctx, "sample-apiserver", metav1.DeleteOptions{})
@@ -141,7 +151,15 @@ func generateSampleAPIServerObjectNames(namespace string) sampleAPIServerObjectN
 // Test cases that call this function should be marked as serial due to potential conflicts
 // with other test cases that also set up a sample-apiserver. For more information, see
 // https://github.com/kubernetes/kubernetes/issues/119582#issuecomment-2215054411.
-func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient *aggregatorclient.Clientset, image string, n sampleAPIServerObjectNames, apiServiceGroupName, apiServiceVersion string) {
+func SetUpSampleAPIServer(
+	ctx context.Context,
+	f *framework.Framework,
+	aggrclient *aggregatorclient.Clientset,
+	image string,
+	n sampleAPIServerObjectNames,
+	apiServiceGroupName, apiServiceVersion string,
+	useCTBTrust bool,
+) {
 	ginkgo.By("Registering the sample API server.")
 	client := f.ClientSet
 	restClient := client.Discovery().RESTClient()
@@ -358,8 +376,7 @@ func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclien
 	err = e2edeployment.WaitForDeploymentComplete(client, deployment)
 	framework.ExpectNoError(err, "deploying extension apiserver in namespace %s", n.namespace)
 
-	// kubectl create -f apiservice.yaml
-	_, err = aggrclient.ApiregistrationV1().APIServices().Create(ctx, &apiregistrationv1.APIService{
+	apiService := &apiregistrationv1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: apiServiceName},
 		Spec: apiregistrationv1.APIServiceSpec{
 			Service: &apiregistrationv1.ServiceReference{
@@ -373,7 +390,25 @@ func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclien
 			GroupPriorityMinimum: 2000,
 			VersionPriority:      200,
 		},
-	}, metav1.CreateOptions{})
+	}
+
+	if useCTBTrust {
+		_, err = client.CertificatesV1().ClusterTrustBundles().Create(ctx, &certv1.ClusterTrustBundle{
+			Name: clusterTrustBundleName,
+			Spec: certv1.ClusterTrustBundleSpec{
+				SignerName:  testSignerName,
+				TrustBundle: string(certCtx.signingCert),
+			},
+		}, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "creating clustertrustbundle %s", "e2e.kubernetes.io:aggregator-tests:testing")
+
+		apiService.Spec.ClusterTrustBundle = &apiregistrationv1.ClusterTrustBundleSelector{
+			SignerName: new(testSignerName),
+		}
+	}
+
+	// kubectl create -f apiservice.yaml
+	_, err = aggrclient.ApiregistrationV1().APIServices().Create(ctx, apiService, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "creating apiservice %s", apiServiceName)
 
 	var (
@@ -425,9 +460,15 @@ func SetUpSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclien
 
 // TestSampleAPIServer is a basic test if the sample-apiserver code from 1.29 and compiled against 1.29
 // will work on the current Aggregator/API-Server.
-func TestSampleAPIServer(ctx context.Context, f *framework.Framework, aggrclient *aggregatorclient.Clientset, image, apiServiceGroupName, apiServiceVersion string) {
+func TestSampleAPIServer(
+	ctx context.Context,
+	f *framework.Framework,
+	aggrclient *aggregatorclient.Clientset,
+	image, apiServiceGroupName, apiServiceVersion string,
+	useCTBTrust bool,
+) {
 	n := generateSampleAPIServerObjectNames(f.Namespace.Name)
-	SetUpSampleAPIServer(ctx, f, aggrclient, image, n, apiServiceGroupName, apiServiceVersion)
+	SetUpSampleAPIServer(ctx, f, aggrclient, image, n, apiServiceGroupName, apiServiceVersion, useCTBTrust)
 	client := f.ClientSet
 	restClient := client.Discovery().RESTClient()
 

@@ -127,7 +127,7 @@ var _ = SIGDescribe("CBOR", feature.CBOR, func() {
 		g.DeferCleanup(func(ctx context.Context) {
 			cleanupSampleAPIServer(ctx, f.ClientSet, aggregatorClient, objectNames, samplev1alpha1.SchemeGroupVersion.Version+"."+samplev1alpha1.SchemeGroupVersion.Group)
 		})
-		SetUpSampleAPIServer(ctx, f, aggregatorClient, imageutils.GetE2EImage(imageutils.APIServer), objectNames, samplev1alpha1.SchemeGroupVersion.Group, samplev1alpha1.SchemeGroupVersion.Version)
+		SetUpSampleAPIServer(ctx, f, aggregatorClient, imageutils.GetE2EImage(imageutils.APIServer), objectNames, samplev1alpha1.SchemeGroupVersion.Group, samplev1alpha1.SchemeGroupVersion.Version, false)
 
 		flunder := samplev1alpha1.Flunder{
 			ObjectMeta: metav1.ObjectMeta{

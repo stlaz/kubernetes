@@ -180,7 +180,7 @@ var _ = SIGDescribe("OpenAPIV3", func() {
 		aggrclient, err := aggregatorclient.NewForConfig(config)
 		framework.ExpectNoError(err)
 		names := generateSampleAPIServerObjectNames(f.Namespace.Name)
-		SetUpSampleAPIServer(ctx, f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer), names, samplev1beta1.GroupName, "v1beta1")
+		SetUpSampleAPIServer(ctx, f, aggrclient, imageutils.GetE2EImage(imageutils.APIServer), names, samplev1beta1.GroupName, "v1beta1", false)
 		defer cleanupSampleAPIServer(ctx, f.ClientSet, aggrclient, names, "v1beta1.wardle.example.com")
 
 		c := openapi3.NewRoot(f.ClientSet.Discovery().OpenAPIV3())
