@@ -171,7 +171,7 @@ func BuildTransportConfig(
 			ServerName: apiService.Spec.Service.Name + "." + apiService.Spec.Service.Namespace + ".svc",
 			CertData:   proxyClientCert,
 			KeyData:    proxyClientKey,
-			CAData:     apiService.Spec.CABundle,
+			CAData:     apiService.Spec.CABundle, // FIXME: add CTB here
 		},
 		DialHolder: proxyTransportDial,
 	}
